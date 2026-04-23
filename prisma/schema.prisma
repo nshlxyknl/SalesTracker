@@ -70,6 +70,7 @@ model Verification {
 
 model Sale {
   id              String   @id @default(cuid())
+  billNumber      String
   itemName        String
   quantity        Int
   unitPrice       Float

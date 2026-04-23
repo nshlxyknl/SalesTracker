@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Admins see all sales; users see only their own
   const isAdmin = (session.user as { role?: string }).role === "admin";
   const sales = await prisma.sale.findMany({
     where: isAdmin ? undefined : { userId: session.user.id },
@@ -23,14 +22,18 @@ export async function POST(request: NextRequest) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await request.formData();
-  const itemName = formData.get("itemName") as string;
-  const quantity = parseInt(formData.get("quantity") as string, 10);
-  const unitPrice = parseFloat(formData.get("unitPrice") as string);
+  const itemsJson = formData.get("items") as string;
   const paymentMethod = formData.get("paymentMethod") as string;
   const billFile = formData.get("billImage") as File | null;
 
-  if (!itemName || isNaN(quantity) || isNaN(unitPrice) || !paymentMethod) {
+  if (!itemsJson || !paymentMethod) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const items: { itemName: string; quantity: number; unitPrice: number }[] = JSON.parse(itemsJson);
+
+  if (!items.length) {
+    return Response.json({ error: "No items provided" }, { status: 400 });
   }
 
   let billImageBase64: string | null = null;
@@ -42,18 +45,23 @@ export async function POST(request: NextRequest) {
     billImageName = billFile.name;
   }
 
-  const sale = await prisma.sale.create({
-    data: {
-      itemName,
-      quantity,
-      unitPrice,
-      totalAmount: quantity * unitPrice,
-      paymentMethod,
-      billImageBase64,
-      billImageName,
-      userId: session.user.id,
-    },
-  });
+  // Create all line items in a single transaction
+  const created = await prisma.$transaction(
+    items.map((item) =>
+      prisma.sale.create({
+        data: {
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalAmount: item.quantity * item.unitPrice,
+          paymentMethod,
+          billImageBase64,
+          billImageName,
+          userId: session.user.id,
+        },
+      })
+    )
+  );
 
-  return Response.json(sale, { status: 201 });
+  return Response.json(created, { status: 201 });
 }
