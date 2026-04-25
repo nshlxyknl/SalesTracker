@@ -7,19 +7,22 @@ datasource db {
   provider = "postgresql"
 }
 
+// better-auth requires: id, name, email, emailVerified, createdAt, updatedAt
+// username and role are your app fields
 model User {
   id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean
+  name          String                      // internally set to username
+  email         String    @unique           // internally set to username@internal.local
+  emailVerified Boolean   @default(false)
   image         String?
+  username      String    @unique
   role          String    @default("user")
-  username      String?   @unique
   createdAt     DateTime
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
   sales         Sale[]
+  vanLoads      VanLoad[]
 
   @@map("user")
 }
@@ -70,7 +73,7 @@ model Verification {
 
 model Sale {
   id              String   @id @default(cuid())
-  billNumber      String
+  billNumber      String   @default("")
   itemName        String
   quantity        Int
   unitPrice       Float
@@ -83,4 +86,18 @@ model Sale {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sale")
+}
+
+model VanLoad {
+  id         String   @id @default(cuid())
+  date       DateTime @default(now())
+  itemName   String
+  loaded     Int
+  returned   Int      @default(0)
+  unitPrice  Float
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@map("van_load")
 }
