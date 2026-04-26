@@ -10,8 +10,6 @@ interface StockReconciliationItem {
   expectedSold: number; // loaded - returned
   actualSold: number;   // from sales records
   difference: number;   // expectedSold - actualSold
-  unitPrice: number;
-  valueDifference: number; // difference * unitPrice
 }
 
 interface StockReconciliationResult {
@@ -19,7 +17,6 @@ interface StockReconciliationResult {
   userId: string;
   username: string;
   items: StockReconciliationItem[];
-  totalValueDifference: number;
   summary: {
     totalLoaded: number;
     totalReturned: number;
@@ -92,7 +89,6 @@ export async function GET(request: NextRequest) {
       const expectedSold = load.loaded - load.returned;
       const actualSold = salesByItem[load.itemName] || 0;
       const difference = expectedSold - actualSold;
-      const valueDifference = difference * load.unitPrice;
 
       return {
         itemName: load.itemName,
@@ -100,9 +96,7 @@ export async function GET(request: NextRequest) {
         returned: load.returned,
         expectedSold,
         actualSold,
-        difference,
-        unitPrice: load.unitPrice,
-        valueDifference
+        difference
       };
     });
 
@@ -121,14 +115,11 @@ export async function GET(request: NextRequest) {
       totalDifference: 0
     });
 
-    const totalValueDifference = items.reduce((sum, item) => sum + item.valueDifference, 0);
-
     const result: StockReconciliationResult = {
       date,
       userId,
       username: vanLoads[0].user.username,
       items,
-      totalValueDifference,
       summary
     };
 

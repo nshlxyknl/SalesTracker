@@ -6,6 +6,7 @@ import { useSession } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import QuickExportDropdown from "@/components/quick-export-dropdown";
 
 type Sale = {
   id: string;
@@ -179,6 +180,7 @@ export default function AdminPage() {
                 <option value="cheque">Cheque</option>
                 <option value="credit">Credit</option>
               </select>
+              <QuickExportDropdown />
               <button onClick={() => queryClient.invalidateQueries({ queryKey: ["sales-admin"] })} className="text-xs text-gray-400 hover:text-gray-700 px-2">↻</button>
             </div>
           </div>

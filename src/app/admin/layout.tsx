@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { BarChart3, LayoutDashboard, Truck, LogOut, ShoppingCart, Calculator } from "lucide-react";
+import { BarChart3, LayoutDashboard, Truck, LogOut, ShoppingCart, Calculator, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { label: "Van Stock", href: "/admin/van-stock", icon: Truck },
   { label: "Sales", href: "/admin/sales", icon: ShoppingCart },
   { label: "Stock Reconciliation", href: "/admin/stock-reconciliation", icon: Calculator },
+  { label: "Export Reports", href: "/admin/export", icon: Download },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

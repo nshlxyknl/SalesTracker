@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { userId, date, items } = body as {
       userId: string;
       date: string;
-      items: { itemName: string; loaded: number; returned: number; unitPrice: number }[];
+      items: { itemName: string; loaded: number; returned: number }[];
     };
 
     if (!userId || !date || !items?.length) {
@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
           itemName: item.itemName,
           loaded: item.loaded,
           returned: item.returned,
-          unitPrice: item.unitPrice,
         },
       });
       created.push(load);

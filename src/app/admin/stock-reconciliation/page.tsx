@@ -13,8 +13,6 @@ interface StockReconciliationItem {
   expectedSold: number;
   actualSold: number;
   difference: number;
-  unitPrice: number;
-  valueDifference: number;
 }
 
 interface StockReconciliationResult {
@@ -22,7 +20,6 @@ interface StockReconciliationResult {
   userId: string;
   username: string;
   items: StockReconciliationItem[];
-  totalValueDifference: number;
   summary: {
     totalLoaded: number;
     totalReturned: number;
@@ -73,13 +70,6 @@ export default function StockReconciliationPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount / 100); // Assuming prices are in cents
   };
 
   return (
@@ -168,13 +158,13 @@ export default function StockReconciliationPage() {
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <div className={`text-xl font-bold ${data.totalValueDifference === 0 ? 'text-green-600' : data.totalValueDifference > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                  Total Value Difference: {formatCurrency(data.totalValueDifference)}
+                <div className={`text-xl font-bold ${data.summary.totalDifference === 0 ? 'text-green-600' : data.summary.totalDifference > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                  Total Quantity Difference: {data.summary.totalDifference > 0 ? '+' : ''}{data.summary.totalDifference}
                 </div>
                 <div className="text-sm text-gray-600 mt-1">
-                  {data.totalValueDifference > 0 && "Positive = Missing stock (potential loss)"}
-                  {data.totalValueDifference < 0 && "Negative = Extra sales recorded"}
-                  {data.totalValueDifference === 0 && "Perfect match!"}
+                  {data.summary.totalDifference > 0 && "Positive = Missing stock (potential loss)"}
+                  {data.summary.totalDifference < 0 && "Negative = Extra sales recorded"}
+                  {data.summary.totalDifference === 0 && "Perfect match!"}
                 </div>
               </div>
             </CardContent>
@@ -187,7 +177,7 @@ export default function StockReconciliationPage() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-300">
+                  <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-50">
                       <th className="border border-gray-300 p-2 text-left">Item</th>
@@ -196,8 +186,6 @@ export default function StockReconciliationPage() {
                       <th className="border border-gray-300 p-2 text-center">Expected Sold</th>
                       <th className="border border-gray-300 p-2 text-center">Actual Sold</th>
                       <th className="border border-gray-300 p-2 text-center">Difference</th>
-                      <th className="border border-gray-300 p-2 text-center">Unit Price</th>
-                      <th className="border border-gray-300 p-2 text-center">Value Diff</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -213,13 +201,6 @@ export default function StockReconciliationPage() {
                           item.difference > 0 ? 'text-red-600' : 'text-blue-600'
                         }`}>
                           {item.difference > 0 ? '+' : ''}{item.difference}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-center">{formatCurrency(item.unitPrice)}</td>
-                        <td className={`border border-gray-300 p-2 text-center font-bold ${
-                          item.valueDifference === 0 ? 'text-green-600' : 
-                          item.valueDifference > 0 ? 'text-red-600' : 'text-blue-600'
-                        }`}>
-                          {formatCurrency(item.valueDifference)}
                         </td>
                       </tr>
                     ))}

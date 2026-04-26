@@ -94,7 +94,6 @@ model VanLoad {
   itemName   String
   loaded     Int
   returned   Int      @default(0)
-  unitPrice  Float
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
