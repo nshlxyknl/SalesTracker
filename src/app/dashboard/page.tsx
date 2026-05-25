@@ -67,7 +67,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isPending && !session?.user) router.push("/login");
     if (!isPending && session?.user) {
-      const role = (session.user as { role?: string }).role;
+      const role = session.user.role;
       if (role === "admin") router.replace("/admin");
     }
   }, [isPending, session, router]);
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     );
   }
 
-  const user = session.user as { name: string; email: string; role?: string };
+  const user = session.user;
   const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
 
   return (

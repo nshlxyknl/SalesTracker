@@ -20,25 +20,38 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
 
-    const fd = new FormData(e.currentTarget);
-    const username = (fd.get("username") as string).toLowerCase().trim();
-    const password = fd.get("password") as string;
-    const internalEmail = `${username}@internal.local`;
+    try {
+      const fd = new FormData(e.currentTarget);
+      const username = (fd.get("username") as string).toLowerCase().trim();
+      const password = fd.get("password") as string;
+      
+      // Validate inputs
+      if (!username || !password) {
+        setError("Username and password are required.");
+        setLoading(false);
+        return;
+      }
+      
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters long.");
+        setLoading(false);
+        return;
+      }
 
-    const res = await signUp.email({
-      name: username,
-      email: internalEmail,
-      password,
-      // @ts-expect-error — better-auth additionalFields
-      username,
-    });
+      const result = await signUp(username, password);
 
-    setLoading(false);
-    if (res.error) {
-      setError(res.error.message ?? "Something went wrong.");
-    } else {
-      router.push("/dashboard");
-      router.refresh();
+      setLoading(false);
+      if (!result.success) {
+        setError(result.error || "Signup failed");
+      } else {
+        // New users get 'user' role by default, redirect to user dashboard
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Signup error:", error);
+      setError("An unexpected error occurred. Please try again.");
+      setLoading(false);
     }
   }
 

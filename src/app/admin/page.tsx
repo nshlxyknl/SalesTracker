@@ -77,14 +77,13 @@ export default function AdminPage() {
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["sales-admin"],
     queryFn: fetchSales,
-    enabled: (session?.user as { role?: string })?.role === "admin",
+    enabled: session?.user?.role === "admin",
   });
 
   useEffect(() => {
     if (!isPending) {
-      const user = session?.user as { role?: string } | undefined;
       if (!session?.user) { router.push("/login"); return; }
-      if (user?.role !== "admin") { router.push("/dashboard"); return; }
+      if (session.user.role !== "admin") { router.push("/dashboard"); return; }
     }
   }, [isPending, session, router]);
 

@@ -20,31 +20,36 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const fd = new FormData(e.currentTarget);
-    const username = (fd.get("username") as string).toLowerCase().trim();
-    const password = fd.get("password") as string;
+    try {
+      const fd = new FormData(e.currentTarget);
+      const username = (fd.get("username") as string).toLowerCase().trim();
+      const password = fd.get("password") as string;
 
-    const lookup = await fetch("/api/auth/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
+      // Validate inputs
+      if (!username || !password) {
+        setError("Username and password are required.");
+        setLoading(false);
+        return;
+      }
 
-    if (!lookup.ok) {
-      setError("Username not found.");
+      const result = await signIn(username, password);
+
       setLoading(false);
-      return;
-    }
-
-    const { email } = await lookup.json();
-    const res = await signIn.email({ email, password });
-
-    setLoading(false);
-    if (res.error) {
-      setError("Invalid username or password.");
-    } else {
-      router.push("/dashboard");
-      router.refresh();
+      if (!result.success) {
+        setError(result.error || "Login failed");
+      } else {
+        // Redirect based on user role
+        if (result.user?.role === 'admin') {
+          router.push("/admin");
+        } else {
+          router.push("/dashboard");
+        }
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An unexpected error occurred. Please try again.");
+      setLoading(false);
     }
   }
 

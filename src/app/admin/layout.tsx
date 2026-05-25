@@ -19,7 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
-  const name = session?.user?.name ?? "A";
+  const name = session?.user?.username ?? "A";
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
