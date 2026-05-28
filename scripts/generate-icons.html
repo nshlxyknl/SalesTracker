@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div id="output"></div>
+
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+
+        function generateIcon(size) {
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Draw background with rounded corners
+            const radius = size * 0.125; // 12.5% radius
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fill();
+            
+            // Draw document lines
+            const lineHeight = size * 0.0625; // 6.25% of size
+            const lineSpacing = size * 0.125; // 12.5% spacing
+            const startY = size * 0.3125; // Start at 31.25%
+            const lineWidth = size * 0.5; // 50% width
+            const startX = size * 0.25; // Start at 25%
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(startX, startY, lineWidth, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing, lineWidth, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing * 2, lineWidth * 0.75, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing * 3, lineWidth * 0.5, lineHeight);
+            
+            // Draw checkmark circle
+            const circleRadius = size * 0.09375; // 9.375% radius
+            const circleX = size * 0.75; // 75% from left
+            const circleY = size * 0.71875; // 71.875% from top
+            
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, circleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw checkmark
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = size * 0.0078125; // 0.78125% of size
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(circleX - circleRadius * 0.5, circleY);
+            ctx.lineTo(circleX - circleRadius * 0.2, circleY + circleRadius * 0.3);
+            ctx.lineTo(circleX + circleRadius * 0.5, circleY - circleRadius * 0.3);
+            ctx.stroke();
+            
+            // Convert to blob and create download link
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `icon-${size}x${size}.png`;
+                link.textContent = `Download ${size}x${size} icon`;
+                link.style.display = 'block';
+                link.style.margin = '5px 0';
+                output.appendChild(link);
+            });
+        }
+
+        // Generate maskable icons (with safe area)
+        function generateMaskableIcon(size) {
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Draw background (full bleed for maskable)
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw content in safe area (80% of size, centered)
+            const safeSize = size * 0.8;
+            const offset = size * 0.1;
+            
+            // Draw document lines in safe area
+            const lineHeight = safeSize * 0.0625;
+            const lineSpacing = safeSize * 0.125;
+            const startY = offset + safeSize * 0.3125;
+            const lineWidth = safeSize * 0.5;
+            const startX = offset + safeSize * 0.25;
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(startX, startY, lineWidth, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing, lineWidth, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing * 2, lineWidth * 0.75, lineHeight);
+            ctx.fillRect(startX, startY + lineSpacing * 3, lineWidth * 0.5, lineHeight);
+            
+            // Draw checkmark circle in safe area
+            const circleRadius = safeSize * 0.09375;
+            const circleX = offset + safeSize * 0.75;
+            const circleY = offset + safeSize * 0.71875;
+            
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, circleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw checkmark
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = safeSize * 0.0078125;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(circleX - circleRadius * 0.5, circleY);
+            ctx.lineTo(circleX - circleRadius * 0.2, circleY + circleRadius * 0.3);
+            ctx.lineTo(circleX + circleRadius * 0.5, circleY - circleRadius * 0.3);
+            ctx.stroke();
+            
+            // Convert to blob and create download link
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `icon-${size}x${size}-maskable.png`;
+                link.textContent = `Download ${size}x${size} maskable icon`;
+                link.style.display = 'block';
+                link.style.margin = '5px 0';
+                output.appendChild(link);
+            });
+        }
+
+        // Generate all icons
+        sizes.forEach(size => generateIcon(size));
+        
+        // Generate maskable icons for key sizes
+        [192, 512].forEach(size => generateMaskableIcon(size));
+        
+        // Add instructions
+        const instructions = document.createElement('div');
+        instructions.innerHTML = `
+            <h3>Instructions:</h3>
+            <p>1. Right-click each link and save the files to the public/icons/ directory</p>
+            <p>2. Make sure the filenames match exactly what's in the manifest.json</p>
+        `;
+        instructions.style.marginTop = '20px';
+        output.appendChild(instructions);
+    </script>
+</body>
+</html>

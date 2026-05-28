@@ -7,14 +7,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sales     Sale[]
-  vanLoads  VanLoad[]
+  id              String            @id @default(cuid())
+  username        String            @unique
+  password        String
+  role            String            @default("user")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  sales           Sale[]
+  vanLoads        VanLoad[]
+  billSubmissions BillSubmission[]
+  syncOperations  SyncOperation[]
 
   @@map("user")
 }
@@ -32,6 +34,7 @@ model Sale {
   createdAt       DateTime @default(now())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncStatus      String   @default("synced") // "pending", "synced", "failed"
 
   @@map("sale")
 }
@@ -45,6 +48,53 @@ model VanLoad {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+  syncStatus String   @default("synced") // "pending", "synced", "failed"
 
   @@map("van_load")
+}
+model BillSubmission {
+  id            String   @id @default(cuid())
+  billNumber    String
+  imageData     String
+  imageName     String
+  selectedItems Json     // Array of SelectedItem
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  syncStatus    String   @default("synced") // "pending", "synced", "failed"
+
+  @@map("bill_submission")
+}
+
+model SyncOperation {
+  id          String    @id @default(cuid())
+  type        String    // "CREATE", "UPDATE", "DELETE"
+  endpoint    String
+  data        Json
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String    @default("pending") // "pending", "completed", "failed"
+  retryCount  Int       @default(0)
+  maxRetries  Int       @default(3)
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  error       String?
+
+  @@map("sync_operation")
+}
+
+model ReconciliationReport {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime
+  summary       Json     // ReconciliationSummary
+  itemDetails   Json     // Array of ItemReconciliation
+  paymentData   Json     // PaymentRecord
+  discrepancies Json     // Array of DiscrepancyAlert
+  status        String   // "balanced", "discrepancies_found"
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, date])
+  @@map("reconciliation_report")
 }

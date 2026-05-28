@@ -49,29 +49,57 @@ export function verifyToken(token: string): { userId: string; username: string; 
 
 export async function signUp(username: string, password: string): Promise<AuthResult> {
   try {
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { username: username.toLowerCase().trim() }
-    });
-
-    if (existingUser) {
-      return { success: false, error: 'Username already exists' };
-    }
-
     // Validate input
     if (!username || !password) {
       return { success: false, error: 'Username and password are required' };
+    }
+
+    const trimmedUsername = username.toLowerCase().trim();
+
+    // Enhanced validation
+    if (trimmedUsername.length < 3) {
+      return { success: false, error: 'Username must be at least 3 characters long' };
+    }
+
+    if (trimmedUsername.length > 30) {
+      return { success: false, error: 'Username must be less than 30 characters' };
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      return { success: false, error: 'Username can only contain letters, numbers, and underscores' };
     }
 
     if (password.length < 8) {
       return { success: false, error: 'Password must be at least 8 characters long' };
     }
 
+    if (password.length > 128) {
+      return { success: false, error: 'Password must be less than 128 characters' };
+    }
+
+    // Check password complexity
+    if (!/[a-zA-Z]/.test(password)) {
+      return { success: false, error: 'Password must contain at least one letter' };
+    }
+
+    if (!/\d/.test(password)) {
+      return { success: false, error: 'Password must contain at least one number' };
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { username: trimmedUsername }
+    });
+
+    if (existingUser) {
+      return { success: false, error: 'Username already exists' };
+    }
+
     // Hash password and create user
     const hashedPassword = await hashPassword(password);
     const user = await prisma.user.create({
       data: {
-        username: username.toLowerCase().trim(),
+        username: trimmedUsername,
         password: hashedPassword,
         role: 'user' // Default role for new users
       }
@@ -98,9 +126,16 @@ export async function signUp(username: string, password: string): Promise<AuthRe
 
 export async function signIn(username: string, password: string): Promise<AuthResult> {
   try {
+    // Validate input
+    if (!username || !password) {
+      return { success: false, error: 'Username and password are required' };
+    }
+
+    const trimmedUsername = username.toLowerCase().trim();
+
     // Find user
     const user = await prisma.user.findUnique({
-      where: { username: username.toLowerCase().trim() }
+      where: { username: trimmedUsername }
     });
 
     if (!user) {
@@ -154,3 +189,55 @@ export async function getUserFromToken(token: string): Promise<User | null> {
     return null;
   }
 }
+
+// Helper function for API routes to get current user from request
+export async function auth(request: Request): Promise<User | null> {
+  try {
+    // Get token from cookies
+    const cookieHeader = request.headers.get('cookie');
+    if (!cookieHeader) return null;
+
+    const cookies = Object.fromEntries(
+      cookieHeader.split('; ').map(cookie => {
+        const [name, value] = cookie.split('=');
+        return [name, decodeURIComponent(value)];
+      })
+    );
+
+    const token = cookies['auth-token'];
+    if (!token) return null;
+
+    return await getUserFromToken(token);
+  } catch {
+    return null;
+  }
+}
+
+// Auth object with API methods for compatibility with existing API routes
+export const authAPI = {
+  api: {
+    getSession: async ({ headers }: { headers: Headers }) => {
+      try {
+        const cookieHeader = headers.get('cookie');
+        if (!cookieHeader) return null;
+
+        const cookies = Object.fromEntries(
+          cookieHeader.split('; ').map(cookie => {
+            const [name, value] = cookie.split('=');
+            return [name, decodeURIComponent(value)];
+          })
+        );
+
+        const token = cookies['auth-token'];
+        if (!token) return null;
+
+        const user = await getUserFromToken(token);
+        if (!user) return null;
+
+        return { user };
+      } catch {
+        return null;
+      }
+    }
+  }
+};

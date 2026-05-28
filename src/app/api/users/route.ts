@@ -1,6 +1,9 @@
-import { auth } from "@/lib/auth";
+import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
+
+// Prevent static generation for this API route
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -12,7 +15,7 @@ export async function GET() {
 
     const users = await prisma.user.findMany({
       where: { role: "user" },
-      select: { id: true, username: true, name: true },
+      select: { id: true, username: true },
       orderBy: { username: "asc" },
     });
 

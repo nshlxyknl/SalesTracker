@@ -18,12 +18,12 @@ type Sale = {
   paymentMethod: string;
   billImageBase64: string | null;
   createdAt: string;
-  user: { name: string; email: string };
+  user: { username: string };
 };
 
 type Bill = {
   billNumber: string;
-  user: { name: string; email: string };
+  user: { username: string };
   paymentMethod: string;
   billTotal: number;
   billImageBase64: string | null;
@@ -100,7 +100,7 @@ export default function AdminPage() {
   const filtered = bills.filter((b) => {
     const matchSearch =
       (b.billNumber ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (b.user?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (b.user?.username ?? "").toLowerCase().includes(search.toLowerCase()) ||
       b.items.some((i) => (i.itemName ?? "").toLowerCase().includes(search.toLowerCase()));
     const matchPayment = filterPayment === "all" || b.paymentMethod === filterPayment;
     return matchSearch && matchPayment;
@@ -113,9 +113,10 @@ export default function AdminPage() {
 
   const byUser = Object.values(
     sales.reduce<Record<string, { name: string; total: number; count: number }>>((acc, s) => {
-      if (!acc[s.user.email]) acc[s.user.email] = { name: s.user.name, total: 0, count: 0 };
-      acc[s.user.email].total += s.totalAmount;
-      acc[s.user.email].count += 1;
+      const userId = s.user.username;
+      if (!acc[userId]) acc[userId] = { name: s.user.username, total: 0, count: 0 };
+      acc[userId].total += s.totalAmount;
+      acc[userId].count += 1;
       return acc;
     }, {})
   ).sort((a, b) => b.total - a.total);
@@ -203,7 +204,7 @@ export default function AdminPage() {
                     <button onClick={() => toggleExpand(bill.billNumber)} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left">
                       {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
                       <span className="font-mono text-sm font-semibold text-gray-900 w-16 flex-shrink-0">#{bill.billNumber}</span>
-                      <span className="text-sm text-gray-600 flex-1 truncate">{bill.user.name}</span>
+                      <span className="text-sm text-gray-600 flex-1 truncate">{bill.user.username}</span>
                       <span className="text-xs text-gray-400 hidden sm:block w-20 flex-shrink-0">{bill.items.length} item{bill.items.length > 1 ? "s" : ""}</span>
                       <span className="font-semibold text-gray-900 w-28 text-right flex-shrink-0">Rs {bill.billTotal.toFixed(2)}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize flex-shrink-0 ${PAYMENT_COLORS[bill.paymentMethod] ?? ""}`}>{bill.paymentMethod}</span>

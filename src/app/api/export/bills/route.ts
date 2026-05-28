@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
 import ExcelJS from "exceljs";
+
+// Prevent static generation for this API route
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
     const sales = await prisma.sale.findMany({
       where,
       include: {
-        user: { select: { username: true, name: true } }
+        user: { select: { username: true } }
       },
       orderBy: { createdAt: "desc" }
     });

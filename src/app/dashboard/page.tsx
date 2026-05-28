@@ -9,6 +9,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, LogOut, ShieldCheck } from "lucide-react";
+import { RoleGuard } from "@/components/auth/RoleGuard";
+import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
 
 type Sale = {
   id: string;
@@ -124,35 +126,8 @@ export default function DashboardPage() {
   const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <nav className="border-b border-gray-200 bg-white px-6 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-            <BarChart3 className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-semibold text-gray-900">Sales Tracker</span>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger className="focus:outline-none">
-            <Avatar>
-              <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {user.role === "admin" && (
-              <DropdownMenuItem onClick={() => router.push("/admin")}>
-                <ShieldCheck className="w-4 h-4 mr-2" /> Admin Panel
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => signOut().then(() => router.push("/login"))} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-              <LogOut className="w-4 h-4 mr-2" /> Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </nav>
-
+    <RoleGuard requiredPermissions={['view_dashboard', 'create_sale']} fallbackRoute="/login">
+      <RoleBasedNav showSidebar={false}>
       <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Form */}
         <div className="lg:col-span-2">
@@ -334,6 +309,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+    </RoleBasedNav>
+    </RoleGuard>
 
       {billPreviewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setBillPreviewModal(null)}>

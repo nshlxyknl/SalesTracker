@@ -3,17 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Loader2 } from "lucide-react";
+import { BarChart3, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refresh } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,7 +25,7 @@ export default function LoginPage() {
 
     try {
       const fd = new FormData(e.currentTarget);
-      const username = (fd.get("username") as string).toLowerCase().trim();
+      const username = (fd.get("username") as string)?.trim();
       const password = fd.get("password") as string;
 
       // Validate inputs
@@ -34,10 +37,13 @@ export default function LoginPage() {
 
       const result = await signIn(username, password);
 
-      setLoading(false);
       if (!result.success) {
         setError(result.error || "Login failed");
+        setLoading(false);
       } else {
+        // Refresh the session context
+        await refresh();
+        
         // Redirect based on user role
         if (result.user?.role === 'admin') {
           router.push("/admin");
@@ -81,19 +87,32 @@ export default function LoginPage() {
                   required
                   placeholder="johndoe"
                   autoComplete="username"
+                  disabled={loading}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -103,7 +122,14 @@ export default function LoginPage() {
               )}
 
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in...</> : "Sign In"}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
 

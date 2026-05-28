@@ -15,6 +15,7 @@ export interface UseSessionReturn {
   data: SessionData | null;
   isPending: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
 }
 
 // Auth Context
@@ -22,6 +23,7 @@ const AuthContext = createContext<UseSessionReturn>({
   data: null,
   isPending: true,
   error: null,
+  refresh: async () => {},
 });
 
 // Auth Provider Component
@@ -30,32 +32,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadSession() {
-      try {
-        setIsPending(true);
-        setError(null);
-        
-        const user = await getCurrentUser();
-        
-        if (user) {
-          setData({ user });
-        } else {
-          setData(null);
-        }
-      } catch (err) {
-        setError('Failed to load session');
+  const loadSession = async () => {
+    try {
+      setIsPending(true);
+      setError(null);
+      
+      const user = await getCurrentUser();
+      
+      if (user) {
+        setData({ user });
+      } else {
         setData(null);
-      } finally {
-        setIsPending(false);
       }
+    } catch (err) {
+      setError('Failed to load session');
+      setData(null);
+    } finally {
+      setIsPending(false);
     }
+  };
 
+  useEffect(() => {
     loadSession();
   }, []);
 
+  // Expose refresh function for manual session updates
+  const contextValue = {
+    data,
+    isPending,
+    error,
+    refresh: loadSession
+  };
+
   return (
-    <AuthContext.Provider value={{ data, isPending, error }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -68,10 +78,27 @@ export function useSession(): UseSessionReturn {
 
 export async function signUp(username: string, password: string): Promise<AuthResponse> {
   try {
+    // Client-side validation
+    if (!username || !password) {
+      return { success: false, error: 'Username and password are required' };
+    }
+
+    if (username.length < 3) {
+      return { success: false, error: 'Username must be at least 3 characters long' };
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return { success: false, error: 'Username can only contain letters, numbers, and underscores' };
+    }
+
+    if (password.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long' };
+    }
+
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username: username.toLowerCase().trim(), password })
     });
 
     const data = await response.json();
@@ -83,28 +110,33 @@ export async function signUp(username: string, password: string): Promise<AuthRe
     return { success: true, user: data.user };
   } catch (error) {
     console.error('Signup error:', error);
-    return { success: false, error: 'Network error' };
+    return { success: false, error: 'Network error. Please check your connection and try again.' };
   }
 }
 
 export async function signIn(username: string, password: string): Promise<AuthResponse> {
   try {
+    // Client-side validation
+    if (!username || !password) {
+      return { success: false, error: 'Username and password are required' };
+    }
+
     const response = await fetch('/api/auth/signin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username: username.toLowerCase().trim(), password })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Signin failed' };
+      return { success: false, error: data.error || 'Sign in failed' };
     }
 
     return { success: true, user: data.user };
   } catch (error) {
     console.error('Signin error:', error);
-    return { success: false, error: 'Network error' };
+    return { success: false, error: 'Network error. Please check your connection and try again.' };
   }
 }
 

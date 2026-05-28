@@ -1,17 +1,29 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { withPermission, requireOwnershipOrAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
-import { headers } from "next/headers";
 
-export async function GET(request: NextRequest) {
+// Prevent static generation for this API route
+export const dynamic = 'force-dynamic';
+
+export const GET = withPermission('view_own_sales', async (request: NextRequest, user) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
 
-    const isAdmin = (session.user as { role?: string }).role === "admin";
+    // If userId is specified, check ownership or admin access
+    if (userId) {
+      const ownershipResult = await requireOwnershipOrAdmin(request, userId);
+      if (ownershipResult instanceof Response) {
+        return ownershipResult;
+      }
+    }
+
+    const isAdmin = user.role === "admin";
+    const targetUserId = userId || user.id;
+
     const sales = await prisma.sale.findMany({
-      where: isAdmin ? undefined : { userId: session.user.id },
-      include: { user: { select: { name: true, email: true } } },
+      where: isAdmin && !userId ? undefined : { userId: targetUserId },
+      include: { user: { select: { username: true } } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -20,13 +32,10 @@ export async function GET(request: NextRequest) {
     console.error("[GET /api/sales]", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withPermission('create_sale', async (request: NextRequest, user) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
     const formData = await request.formData();
     const itemsJson = formData.get("items") as string;
     const paymentMethod = formData.get("paymentMethod") as string;
@@ -49,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Count distinct bill numbers this user already has (outside transaction)
     const existing = await prisma.sale.findMany({
-      where: { userId: session.user.id, NOT: { billNumber: "" } },
+      where: { userId: user.id, NOT: { billNumber: "" } },
       select: { billNumber: true },
     });
     const uniqueBills = new Set(existing.map((s) => s.billNumber));
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           billImageBase64,
           billImageName,
-          userId: session.user.id,
+          userId: user.id,
         },
       });
       created.push(sale);
@@ -79,4 +88,4 @@ export async function POST(request: NextRequest) {
     console.error("[POST /api/sales]", err);
     return Response.json({ error: String(err) }, { status: 500 });
   }
-}
+});

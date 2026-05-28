@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { authAPI as auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 
-// Try direct import
-const prisma = new PrismaClient();
+// Prevent static generation for this API route
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     const loads = await prisma.vanLoad.findMany({
       where,
-      include: { user: { select: { username: true, name: true } } },
+      include: { user: { select: { username: true } } },
       orderBy: { createdAt: "desc" },
     });
 

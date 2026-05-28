@@ -3,17 +3,39 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Loader2 } from "lucide-react";
+import { BarChart3, Loader2, Eye, EyeOff, Check, X } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { refresh } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+
+  // Password validation
+  const passwordChecks = {
+    length: password.length >= 8,
+    hasLetter: /[a-zA-Z]/.test(password),
+    hasNumber: /\d/.test(password),
+  };
+
+  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
+
+  // Username validation
+  const usernameChecks = {
+    length: username.length >= 3,
+    format: /^[a-zA-Z0-9_]+$/.test(username),
+  };
+
+  const isUsernameValid = Object.values(usernameChecks).every(Boolean);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,29 +43,34 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const fd = new FormData(e.currentTarget);
-      const username = (fd.get("username") as string).toLowerCase().trim();
-      const password = fd.get("password") as string;
-      
       // Validate inputs
       if (!username || !password) {
         setError("Username and password are required.");
         setLoading(false);
         return;
       }
-      
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters long.");
+
+      if (!isUsernameValid) {
+        setError("Please fix the username requirements.");
+        setLoading(false);
+        return;
+      }
+
+      if (!isPasswordValid) {
+        setError("Please fix the password requirements.");
         setLoading(false);
         return;
       }
 
       const result = await signUp(username, password);
 
-      setLoading(false);
       if (!result.success) {
         setError(result.error || "Signup failed");
+        setLoading(false);
       } else {
+        // Refresh the session context
+        await refresh();
+        
         // New users get 'user' role by default, redirect to user dashboard
         router.push("/dashboard");
         router.refresh();
@@ -82,23 +109,64 @@ export default function SignupPage() {
                   required
                   placeholder="johndoe"
                   autoComplete="username"
-                  pattern="[a-zA-Z0-9_]+"
-                  title="Letters, numbers and underscores only"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={loading}
                 />
-                <p className="text-gray-400 text-xs">Letters, numbers and underscores only</p>
+                {username && (
+                  <div className="space-y-1 text-xs">
+                    <div className={`flex items-center gap-1 ${usernameChecks.length ? 'text-green-600' : 'text-gray-400'}`}>
+                      {usernameChecks.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      At least 3 characters
+                    </div>
+                    <div className={`flex items-center gap-1 ${usernameChecks.format ? 'text-green-600' : 'text-gray-400'}`}>
+                      {usernameChecks.format ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      Letters, numbers and underscores only
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  placeholder="Min. 8 characters"
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Min. 8 characters"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {password && (
+                  <div className="space-y-1 text-xs">
+                    <div className={`flex items-center gap-1 ${passwordChecks.length ? 'text-green-600' : 'text-gray-400'}`}>
+                      {passwordChecks.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      At least 8 characters
+                    </div>
+                    <div className={`flex items-center gap-1 ${passwordChecks.hasLetter ? 'text-green-600' : 'text-gray-400'}`}>
+                      {passwordChecks.hasLetter ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      Contains a letter
+                    </div>
+                    <div className={`flex items-center gap-1 ${passwordChecks.hasNumber ? 'text-green-600' : 'text-gray-400'}`}>
+                      {passwordChecks.hasNumber ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      Contains a number
+                    </div>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -107,8 +175,19 @@ export default function SignupPage() {
                 </div>
               )}
 
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account...</> : "Create Account"}
+              <Button 
+                type="submit" 
+                disabled={loading || !isUsernameValid || !isPasswordValid} 
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </Button>
             </form>
 

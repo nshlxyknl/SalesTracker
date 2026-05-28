@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
+
+// Prevent static generation for this API route
+export const dynamic = 'force-dynamic';
 
 interface StockReconciliationItem {
   itemName: string;
@@ -57,7 +60,7 @@ export async function GET(request: NextRequest) {
         date: { gte: start, lte: end }
       },
       include: {
-        user: { select: { username: true, name: true } }
+        user: { select: { username: true } }
       }
     });
 
