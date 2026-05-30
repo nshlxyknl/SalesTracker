@@ -1,19 +1,12 @@
 import { NextRequest } from "next/server";
-import { authAPI as auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { withAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export const GET = withAdmin(async (request: NextRequest, user) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if ((session.user as { role?: string }).role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date"); // YYYY-MM-DD
     const userId = searchParams.get("userId");
@@ -39,18 +32,11 @@ export async function GET(request: NextRequest) {
     console.error("[GET /api/van-load]", err);
     return Response.json({ error: String(err) }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAdmin(async (request: NextRequest, user) => {
   try {
     console.log("POST /api/van-load - Starting request");
-    
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if ((session.user as { role?: string }).role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     console.log("Authentication successful");
 
     const body = await request.json();
@@ -114,16 +100,10 @@ export async function POST(request: NextRequest) {
     console.error("Error stack:", err instanceof Error ? err.stack : "No stack trace");
     return Response.json({ error: String(err) }, { status: 500 });
   }
-}
+});
 
-export async function PUT(request: NextRequest) {
+export const PUT = withAdmin(async (request: NextRequest, user) => {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if ((session.user as { role?: string }).role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await request.json();
     const { id, returned } = body as { id: string; returned: number };
 
@@ -141,4 +121,4 @@ export async function PUT(request: NextRequest) {
     console.error("[PUT /api/van-load]", err);
     return Response.json({ error: String(err) }, { status: 500 });
   }
-}
+});

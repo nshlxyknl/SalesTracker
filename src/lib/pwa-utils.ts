@@ -101,9 +101,13 @@ export function showNotification(
   const defaultOptions: NotificationOptions = {
     icon: '/icons/icon-192x192.svg',
     badge: '/icons/icon-72x72.svg',
-    vibrate: [100, 50, 100],
     ...options
   };
+
+  // Add vibration separately if supported
+  if ('vibrate' in navigator && navigator.vibrate) {
+    navigator.vibrate([100, 50, 100]);
+  }
 
   return new Notification(title, defaultOptions);
 }

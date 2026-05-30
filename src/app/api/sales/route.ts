@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { withPermission, requireOwnershipOrAdmin } from "@/lib/api-auth";
+import { withPermission, withUserOrAdmin, requireOwnershipOrAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-export const GET = withPermission('view_own_sales', async (request: NextRequest, user) => {
+export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
@@ -34,7 +34,7 @@ export const GET = withPermission('view_own_sales', async (request: NextRequest,
   }
 });
 
-export const POST = withPermission('create_sale', async (request: NextRequest, user) => {
+export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
   try {
     const formData = await request.formData();
     const itemsJson = formData.get("items") as string;

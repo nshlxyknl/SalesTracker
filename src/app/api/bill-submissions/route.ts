@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { withPermission, requireOwnershipOrAdmin } from "@/lib/api-auth";
+import { withUserOrAdmin, requireOwnershipOrAdmin, withAuth } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-export const GET = withPermission('upload_bills', async (request: NextRequest, user) => {
+export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
@@ -41,7 +41,7 @@ export const GET = withPermission('upload_bills', async (request: NextRequest, u
   }
 });
 
-export const POST = withPermission('upload_bills', async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const formData = await request.formData();
     const billNumber = formData.get("billNumber") as string;
@@ -132,7 +132,7 @@ export const POST = withPermission('upload_bills', async (request: NextRequest, 
   }
 });
 
-export const PUT = withPermission('view_bill_submissions', async (request: NextRequest, user) => {
+export const PUT = withAuth(async (request: NextRequest, user) => {
   try {
     const body = await request.json();
     const { id, processed } = body;

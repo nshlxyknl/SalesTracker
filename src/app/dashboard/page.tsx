@@ -126,9 +126,9 @@ export default function DashboardPage() {
   const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
 
   return (
-    <RoleGuard requiredPermissions={['view_dashboard', 'create_sale']} fallbackRoute="/login">
-      <RoleBasedNav showSidebar={false}>
-      <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
+    <div className="min-h-screen bg-gray-50">
+      <RoleBasedNav>
+        <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Form */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
@@ -308,9 +308,8 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-      </div>
-    </RoleBasedNav>
-    </RoleGuard>
+        </div>
+      </RoleBasedNav>
 
       {billPreviewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setBillPreviewModal(null)}>

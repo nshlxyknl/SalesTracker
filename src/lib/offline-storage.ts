@@ -42,7 +42,7 @@ class IndexedDBManager implements OfflineStorageManager {
   private db: IDBDatabase | null = null;
   private dbPromise: Promise<IDBDatabase> | null = null;
 
-  private async getDB(): Promise<IDBDatabase> {
+  public async getDB(): Promise<IDBDatabase> {
     if (this.db) {
       return this.db;
     }

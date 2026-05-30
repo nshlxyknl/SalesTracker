@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { verifyTokenEdge, extractTokenFromCookies } from '@/lib/auth-edge';
 
 // Define protected routes and their required roles
 const PROTECTED_ROUTES = {
   '/admin': ['admin'],
+  '/admin/van-stock': ['admin'],
+  '/admin/sales': ['admin'],
+  '/admin/stock-reconciliation': ['admin'],
+  '/admin/export': ['admin'],
   '/dashboard': ['user', 'admin'],
   '/api/admin': ['admin'],
   '/api/sales': ['user', 'admin'],
   '/api/van-loads': ['admin'],
+  '/api/van-load': ['admin'],
   '/api/reconciliation': ['admin'],
+  '/api/stock-reconciliation': ['admin'],
   '/api/bill-submissions': ['user', 'admin'],
+  '/api/export': ['admin'],
+  '/api/users': ['admin'],
 } as const;
 
 // Public routes that don't require authentication
@@ -43,13 +51,13 @@ function isPublicRoute(pathname: string): boolean {
 function getRequiredRoles(pathname: string): string[] | null {
   // Check exact matches first
   if (pathname in PROTECTED_ROUTES) {
-    return PROTECTED_ROUTES[pathname as keyof typeof PROTECTED_ROUTES];
+    return [...PROTECTED_ROUTES[pathname as keyof typeof PROTECTED_ROUTES]];
   }
 
   // Check prefix matches for API routes and admin routes
   for (const [route, roles] of Object.entries(PROTECTED_ROUTES)) {
     if (pathname.startsWith(route + '/')) {
-      return roles;
+      return [...roles];
     }
   }
 
@@ -65,7 +73,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Get auth token from cookies
-  const token = request.cookies.get('auth-token')?.value;
+  const token = extractTokenFromCookies(request.headers.get('cookie'));
 
   if (!token) {
     // Redirect to login for protected routes
@@ -75,7 +83,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verify token and get user info
-  const decoded = verifyToken(token);
+  const decoded = verifyTokenEdge(token);
   if (!decoded) {
     // Invalid token, redirect to login
     const loginUrl = new URL('/login', request.url);

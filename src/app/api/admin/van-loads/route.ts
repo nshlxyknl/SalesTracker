@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { withRole } from "@/lib/api-auth";
+import { withAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-export const GET = withRole('admin', async (request: NextRequest, user) => {
+export const GET = withAdmin(async (request: NextRequest, user) => {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
@@ -48,7 +48,7 @@ export const GET = withRole('admin', async (request: NextRequest, user) => {
   }
 });
 
-export const POST = withRole('admin', async (request: NextRequest, user) => {
+export const POST = withAdmin(async (request: NextRequest, user) => {
   try {
     const body = await request.json();
     const { userId, date, items } = body;
@@ -122,7 +122,7 @@ export const POST = withRole('admin', async (request: NextRequest, user) => {
   }
 });
 
-export const PUT = withRole('admin', async (request: NextRequest, user) => {
+export const PUT = withAdmin(async (request: NextRequest, user) => {
   try {
     const body = await request.json();
     const { id, returned } = body;

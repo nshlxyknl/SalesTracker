@@ -85,7 +85,7 @@ export async function requireAuth(request: NextRequest): Promise<{ user: User } 
 }
 
 /**
- * Require specific role for API route
+ * Enhanced role validation with detailed error messages
  */
 export async function requireRole(
   request: NextRequest, 
@@ -100,9 +100,57 @@ export async function requireRole(
   const { user } = authResult;
   
   if (user.role !== requiredRole) {
+    const errorMessage = requiredRole === 'admin' 
+      ? 'Admin access required. This endpoint is restricted to administrators only.'
+      : 'User access required. This endpoint is restricted to regular users only.';
+      
     return new Response(
       JSON.stringify({ 
-        error: `Access denied. Required role: ${requiredRole}` 
+        error: errorMessage,
+        requiredRole,
+        userRole: user.role
+      }),
+      { 
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  return { user };
+}
+
+/**
+ * Require admin role specifically
+ */
+export async function requireAdmin(request: NextRequest): Promise<{ user: User } | Response> {
+  return requireRole(request, 'admin');
+}
+
+/**
+ * Require user role specifically  
+ */
+export async function requireUser(request: NextRequest): Promise<{ user: User } | Response> {
+  return requireRole(request, 'user');
+}
+
+/**
+ * Allow both admin and user roles
+ */
+export async function requireUserOrAdmin(request: NextRequest): Promise<{ user: User } | Response> {
+  const authResult = await requireAuth(request);
+  
+  if (authResult instanceof Response) {
+    return authResult; // Authentication failed
+  }
+
+  const { user } = authResult;
+  
+  if (user.role !== 'admin' && user.role !== 'user') {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Invalid user role. Access denied.',
+        userRole: user.role
       }),
       { 
         status: 403,
@@ -265,6 +313,57 @@ export function withPermission<T extends any[]>(
 ) {
   return async (request: NextRequest, ...args: T): Promise<Response> => {
     const authResult = await requirePermission(request, requiredPermission);
+    
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+
+    return handler(request, authResult.user, ...args);
+  };
+}
+
+/**
+ * Higher-order function to wrap API handlers with admin role requirement
+ */
+export function withAdmin<T extends any[]>(
+  handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
+) {
+  return async (request: NextRequest, ...args: T): Promise<Response> => {
+    const authResult = await requireAdmin(request);
+    
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+
+    return handler(request, authResult.user, ...args);
+  };
+}
+
+/**
+ * Higher-order function to wrap API handlers with user role requirement
+ */
+export function withUser<T extends any[]>(
+  handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
+) {
+  return async (request: NextRequest, ...args: T): Promise<Response> => {
+    const authResult = await requireUser(request);
+    
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+
+    return handler(request, authResult.user, ...args);
+  };
+}
+
+/**
+ * Higher-order function to wrap API handlers allowing both user and admin roles
+ */
+export function withUserOrAdmin<T extends any[]>(
+  handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
+) {
+  return async (request: NextRequest, ...args: T): Promise<Response> => {
+    const authResult = await requireUserOrAdmin(request);
     
     if (authResult instanceof Response) {
       return authResult;

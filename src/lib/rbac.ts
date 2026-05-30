@@ -15,7 +15,11 @@ export type Permission =
   | 'export_reports'
   | 'manage_users'
   | 'upload_bills'
-  | 'view_bill_submissions';
+  | 'view_bill_submissions'
+  | 'admin_access'
+  | 'user_access'
+  | 'manage_reconciliation_reports'
+  | 'view_sync_operations';
 
 // Role-based permissions mapping
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -30,12 +34,16 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'export_reports',
     'manage_users',
     'view_bill_submissions',
+    'admin_access',
+    'manage_reconciliation_reports',
+    'view_sync_operations',
   ],
   user: [
     'view_dashboard',
     'create_sale',
     'view_own_sales',
     'upload_bills',
+    'user_access',
   ],
 };
 
