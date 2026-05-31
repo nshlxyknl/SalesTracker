@@ -5,6 +5,34 @@ import prisma from "@/lib/prisma";
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
+type SaleWithUser = {
+  id: string;
+  billNumber: string;
+  billTitle: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: Date;
+  user: {
+    id: string;
+    username: string;
+  };
+};
+
+type RecentSale = {
+  id: string;
+  billNumber: string;
+  billTitle: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: Date;
+};
+
 export const GET = withPermission('view_all_sales', async (request: NextRequest) => {
   try {
     const url = new URL(request.url);
@@ -42,7 +70,7 @@ export const GET = withPermission('view_all_sales', async (request: NextRequest)
     const userSalesMap = new Map();
     const billsMap = new Map(); // Track unique bills per user
 
-    sales.forEach(sale => {
+    sales.forEach((sale: SaleWithUser) => {
       const userId = sale.user.id;
       const username = sale.user.username;
       const billKey = `${userId}-${sale.billNumber}`;
@@ -97,7 +125,7 @@ export const GET = withPermission('view_all_sales', async (request: NextRequest)
       
       // Limit recent sales to 5 most recent
       userData.recentSales = userData.recentSales
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort((a: RecentSale, b: RecentSale) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
       
       return userData;
