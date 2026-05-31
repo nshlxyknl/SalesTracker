@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, LogOut, ShieldCheck, Package, AlertCircle, CheckCircle } from "lucide-react";
 import { RoleGuard } from "@/components/auth/RoleGuard";
+import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
 
 type Sale = {
   id: string;
@@ -78,6 +79,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
+
+  // Add payment filter state
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ["sales"],
@@ -190,11 +194,17 @@ export default function DashboardPage() {
   }
 
   const user = session.user;
-  const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
+  
+  // Filter sales based on payment method
+  const filteredSales = paymentFilter === "all" 
+    ? sales 
+    : sales.filter(sale => sale.paymentMethod === paymentFilter);
+  
+  const totalRevenue = filteredSales.reduce((s, x) => s + x.totalAmount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
+    <RoleBasedNav>
+      <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Stock Display */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-6">
@@ -233,34 +243,118 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : stockData?.hasStock ? (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {stockData.stock.map((item) => {
-                  const itemConfig = getItemByName(item.itemName);
-                  const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
-                  const loadedDisplay = formatCaseBottleDisplay(item.loaded, bottlesPerCase);
-                  const soldDisplay = formatCaseBottleDisplay(item.sold, bottlesPerCase);
-                  const returnedDisplay = formatCaseBottleDisplay(item.returned, bottlesPerCase);
-                  const remainingDisplay = formatCaseBottleDisplay(item.remaining, bottlesPerCase);
-                  
-                  return (
-                    <div key={item.itemName} className={`flex justify-between items-center p-3 rounded-lg ${
-                      item.remaining > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                    }`}>
-                      <div>
-                        <p className="font-medium text-gray-900">{item.itemName}</p>
-                        <p className="text-xs text-gray-500">
-                          Loaded: {loadedDisplay} • Sold: {soldDisplay} • Returned: {returnedDisplay}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-bold ${item.remaining > 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          {remainingDisplay}
-                        </p>
-                        <p className="text-xs text-gray-500">remaining</p>
+              <div className="space-y-3">
+                {/* Summary Header */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-blue-800">Today's Stock Summary</span>
+                    <span className="text-sm text-blue-600">
+                      {stockData.stock.length} item{stockData.stock.length > 1 ? 's' : ''} assigned
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <span className="text-blue-600">Total Loaded:</span>
+                      <div className="font-bold text-blue-800">
+                        {stockData.stock.reduce((sum, item) => sum + item.loaded, 0)} bottles
                       </div>
                     </div>
-                  );
-                })}
+                    <div>
+                      <span className="text-blue-600">Total Sold:</span>
+                      <div className="font-bold text-blue-800">
+                        {stockData.stock.reduce((sum, item) => sum + item.sold, 0)} bottles
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-blue-600">Remaining:</span>
+                      <div className="font-bold text-blue-800">
+                        {stockData.totalItems} bottles
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Individual Items */}
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {stockData.stock.map((item) => {
+                    const itemConfig = getItemByName(item.itemName);
+                    const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                    const loadedDisplay = formatCaseBottleDisplay(item.loaded, bottlesPerCase);
+                    const soldDisplay = formatCaseBottleDisplay(item.sold, bottlesPerCase);
+                    const returnedDisplay = formatCaseBottleDisplay(item.returned, bottlesPerCase);
+                    const remainingDisplay = formatCaseBottleDisplay(item.remaining, bottlesPerCase);
+                    
+                    return (
+                      <div key={item.itemName} className={`border rounded-lg p-3 ${
+                        item.remaining > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium text-gray-900">{item.itemName}</p>
+                            <p className="text-xs text-gray-500">
+                              1 case = {bottlesPerCase} bottles
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-lg font-bold ${item.remaining > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                              {remainingDisplay}
+                            </p>
+                            <p className="text-xs text-gray-500">available</p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="text-gray-500">Loaded</div>
+                            <div className="font-medium text-blue-600">{loadedDisplay}</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="text-gray-500">Sold</div>
+                            <div className="font-medium text-orange-600">{soldDisplay}</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="text-gray-500">Returned</div>
+                            <div className="font-medium text-purple-600">{returnedDisplay}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Stock Status Indicator */}
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {item.remaining > 0 ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            )}
+                            <span className={`text-xs font-medium ${
+                              item.remaining > 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {item.remaining > 0 ? 'In Stock' : item.remaining === 0 ? 'Sold Out' : 'Oversold'}
+                            </span>
+                          </div>
+                          
+                          {/* Progress Bar */}
+                          <div className="flex-1 mx-3">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full ${
+                                  item.remaining > 0 ? 'bg-green-500' : 'bg-red-500'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(0, (item.remaining / item.loaded) * 100))}%` 
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <span className="text-xs text-gray-400">
+                            {item.loaded > 0 ? Math.round((item.remaining / item.loaded) * 100) : 0}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
@@ -477,17 +571,26 @@ export default function DashboardPage() {
               <>
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                   <p className="text-gray-400 text-xs">Total Sales</p>
-                  <p className="text-2xl font-bold mt-1 text-gray-900">{sales.length}</p>
+                  <p className="text-2xl font-bold mt-1 text-gray-900">{filteredSales.length}</p>
+                  {paymentFilter !== "all" && (
+                    <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>
+                  )}
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                   <p className="text-gray-400 text-xs">Revenue</p>
                   <p className="text-2xl font-bold mt-1 text-gray-900">Rs {totalRevenue.toFixed(0)}</p>
+                  {paymentFilter !== "all" && (
+                    <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>
+                  )}
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                   <p className="text-gray-400 text-xs">This Month</p>
                   <p className="text-2xl font-bold mt-1 text-emerald-600">
-                    Rs {sales.filter((s) => new Date(s.createdAt).getMonth() === new Date().getMonth()).reduce((a, s) => a + s.totalAmount, 0).toFixed(0)}
+                    Rs {filteredSales.filter((s) => new Date(s.createdAt).getMonth() === new Date().getMonth()).reduce((a, s) => a + s.totalAmount, 0).toFixed(0)}
                   </p>
+                  {paymentFilter !== "all" && (
+                    <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>
+                  )}
                 </div>
               </>
             )}
@@ -495,8 +598,28 @@ export default function DashboardPage() {
 
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">My Sales</h2>
-              <button onClick={() => queryClient.invalidateQueries({ queryKey: ["sales"] })} className="text-xs text-gray-400 hover:text-gray-700">Refresh</button>
+              <div>
+                <h2 className="font-semibold text-gray-900">My Sales</h2>
+                {paymentFilter !== "all" && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Showing {filteredSales.length} {paymentFilter} sale{filteredSales.length !== 1 ? 's' : ''} 
+                    {sales.length > filteredSales.length && ` of ${sales.length} total`}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={paymentFilter}
+                  onChange={(e) => setPaymentFilter(e.target.value)}
+                  className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                >
+                  <option value="all">All Payments</option>
+                  <option value="cash">Cash Only</option>
+                  <option value="cheque">Cheque Only</option>
+                  <option value="credit">Credit Only</option>
+                </select>
+                <button onClick={() => queryClient.invalidateQueries({ queryKey: ["sales"] })} className="text-xs text-gray-400 hover:text-gray-700">Refresh</button>
+              </div>
             </div>
 
             {loadingSales ? (
@@ -511,8 +634,10 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-            ) : sales.length === 0 ? (
-              <p className="text-gray-400 text-center py-12 text-sm">No sales yet.</p>
+            ) : filteredSales.length === 0 ? (
+              <p className="text-gray-400 text-center py-12 text-sm">
+                {paymentFilter === "all" ? "No sales yet." : `No ${paymentFilter} sales found.`}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -524,7 +649,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {sales.map((sale) => (
+                    {filteredSales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-xs font-mono text-gray-500">{sale.billNumber}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{sale.billTitle || "Untitled Bill"}</td>
@@ -549,7 +674,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        </div>
+      </div>
 
       {billPreviewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setBillPreviewModal(null)}>
@@ -562,6 +687,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </div>
+    </RoleBasedNav>
   );
 }
