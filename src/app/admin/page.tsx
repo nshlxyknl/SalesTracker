@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight, Users, BarChart3, Package, Settings } from "lucide-react";
 import QuickExportDropdown from "@/components/quick-export-dropdown";
+import { formatCaseBottleDisplay, getItemByName } from "@/app/lib/items";
 
 type Sale = {
   id: string;
@@ -39,6 +40,24 @@ type UserStats = {
   count: number;
 };
 
+type VanLoad = {
+  id: string;
+  itemName: string;
+  loaded: number;
+  returned: number;
+  userId: string;
+  date: string;
+  user: { username: string };
+};
+
+type UserStockSummary = {
+  itemName: string;
+  loaded: number;
+  sold: number;
+  remaining: number;
+  returned: number;
+};
+
 const PAYMENT_COLORS: Record<string, string> = {
   cash: "bg-emerald-100 text-emerald-700",
   cheque: "bg-amber-100 text-amber-700",
@@ -48,6 +67,12 @@ const PAYMENT_COLORS: Record<string, string> = {
 async function fetchSales(): Promise<Sale[]> {
   const res = await fetch("/api/sales");
   if (!res.ok) throw new Error("Failed to fetch");
+  return res.json();
+}
+
+async function fetchUsers(): Promise<{ id: string; username: string }[]> {
+  const res = await fetch("/api/users");
+  if (!res.ok) throw new Error("Failed to fetch users");
   return res.json();
 }
 
@@ -74,6 +99,143 @@ function groupIntoBills(sales: Sale[]): Bill[] {
   return Array.from(map.values());
 }
 
+function UserStockDisplay({ username }: { username: string }) {
+  const { data: session } = useSession();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Fetch user data
+  const { data: user } = useQuery<{ id: string; username: string }>({
+    queryKey: ["user-by-username", username],
+    queryFn: async () => {
+      const res = await fetch(`/api/users/by-username/${encodeURIComponent(username)}`);
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
+    enabled: !!username && session?.user?.role === "admin",
+  });
+
+  // Fetch van loads for today
+  const { data: vanLoads = [], isLoading: loadingLoads } = useQuery<VanLoad[]>({
+    queryKey: ["van-loads-user-stock", user?.id, today],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/van-loads?userId=${user?.id}&date=${today}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user?.id && session?.user?.role === "admin",
+  });
+
+  // Fetch sales for today
+  const { data: sales = [], isLoading: loadingSales } = useQuery<Sale[]>({
+    queryKey: ["sales-user-stock", user?.id, today],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales?userId=${user?.id}&date=${today}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user?.id && session?.user?.role === "admin",
+  });
+
+  // Calculate stock summary
+  const stockSummary: UserStockSummary[] = (() => {
+    const stockMap = new Map<string, UserStockSummary>();
+    
+    // Process loads
+    vanLoads.forEach(load => {
+      const key = load.itemName;
+      if (!stockMap.has(key)) {
+        stockMap.set(key, {
+          itemName: key,
+          loaded: 0,
+          sold: 0,
+          remaining: 0,
+          returned: 0
+        });
+      }
+      const item = stockMap.get(key)!;
+      item.loaded += load.loaded;
+      item.returned += load.returned;
+    });
+    
+    // Process sales
+    sales.forEach(sale => {
+      const key = sale.itemName;
+      if (!stockMap.has(key)) {
+        stockMap.set(key, {
+          itemName: key,
+          loaded: 0,
+          sold: 0,
+          remaining: 0,
+          returned: 0
+        });
+      }
+      const item = stockMap.get(key)!;
+      item.sold += sale.quantity;
+    });
+    
+    // Calculate remaining
+    return Array.from(stockMap.values()).map(item => {
+      item.remaining = item.loaded - item.sold - item.returned;
+      return item;
+    });
+  })();
+
+  if (loadingLoads || loadingSales) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <Skeleton className="h-4 w-24 mb-1" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <Skeleton className="h-4 w-12" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (stockSummary.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-sm text-gray-500 mb-1">No stock assigned for today</p>
+        <p className="text-xs text-gray-400">Stock will appear here once assigned</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {stockSummary.map(item => {
+        const itemConfig = getItemByName(item.itemName);
+        const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+        
+        return (
+          <div key={item.itemName} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">{item.itemName}</p>
+              <p className="text-xs text-gray-500">
+                Loaded: {formatCaseBottleDisplay(item.loaded, bottlesPerCase)} • 
+                Sold: {formatCaseBottleDisplay(item.sold, bottlesPerCase)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className={`text-sm font-semibold ${
+                item.remaining >= 0 ? 'text-green-700' : 'text-red-700'
+              }`}>
+                {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
+              </p>
+              <p className="text-xs text-gray-400">remaining</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -88,6 +250,12 @@ export default function AdminPage() {
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["sales-admin"],
     queryFn: fetchSales,
+    enabled: session?.user?.role === "admin",
+  });
+
+  const { data: users = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ["users-admin"],
+    queryFn: fetchUsers,
     enabled: session?.user?.role === "admin",
   });
 
@@ -127,15 +295,15 @@ export default function AdminPage() {
   const byCheque = filteredSales.filter((s) => s.paymentMethod === "cheque").reduce((a, s) => a + s.totalAmount, 0);
   const byCredit = filteredSales.filter((s) => s.paymentMethod === "credit").reduce((a, s) => a + s.totalAmount, 0);
 
-  const byUser = Object.values(
-    sales.reduce<Record<string, UserStats>>((acc, s) => {
-      const userId = s.user.username;
-      if (!acc[userId]) acc[userId] = { name: s.user.username, total: 0, count: 0 };
-      acc[userId].total += s.totalAmount;
-      acc[userId].count += 1;
-      return acc;
-    }, {})
-  ).sort((a, b) => b.total - a.total);
+  const byUser = users.map(user => {
+    const userSales = sales.filter(s => s.user.username === user.username);
+    const total = userSales.reduce((sum, s) => sum + s.totalAmount, 0);
+    return {
+      name: user.username,
+      total,
+      count: userSales.length
+    };
+  }).sort((a, b) => b.total - a.total);
 
   function toggleExpand(billNumber: string) {
     setExpanded((prev) => {
@@ -201,7 +369,7 @@ export default function AdminPage() {
 
         {/* User List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {isLoading ? (
+          {isLoading || loadingUsers ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 p-3">
                 <Skeleton className="w-10 h-10 rounded-full" />
@@ -213,6 +381,11 @@ export default function AdminPage() {
                 )}
               </div>
             ))
+          ) : byUser.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No users found</p>
+            </div>
           ) : (
             byUser.map((user) => (
               <div key={user.name} className="space-y-1">
@@ -230,7 +403,9 @@ export default function AdminPage() {
                   {!sidebarCollapsed && (
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{user.name}</p>
-                      <p className="text-sm text-gray-500">{user.count} sales • Rs {user.total.toFixed(0)}</p>
+                      <p className="text-sm text-gray-500">
+                        {user.count > 0 ? `${user.count} sales • Rs ${user.total.toFixed(0)}` : 'No sales yet'}
+                      </p>
                     </div>
                   )}
                 </button>
@@ -410,44 +585,33 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Leaderboard */}
+            {/* Current Stock Panel */}
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="font-semibold text-sm text-gray-900">Top Sellers</h2>
-                <button 
-                  onClick={() => router.push('/admin/analytics')}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  View All →
-                </button>
-              </div>
-              <div className="p-4 space-y-3">
-                {isLoading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="w-6 h-6 rounded-full flex-shrink-0" />
-                      <div className="flex-1 space-y-1"><Skeleton className="h-3 w-24" /><Skeleton className="h-3 w-14" /></div>
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                  ))
-                ) : byUser.length === 0 ? (
-                  <p className="text-gray-400 text-xs text-center py-4">No data yet.</p>
-                ) : byUser.map((u, i) => (
-                  <button
-                    key={u.name}
-                    onClick={() => handleUserSelect(u.name)}
-                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
-                      selectedUser === u.name ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-50'
-                    }`}
+                <div>
+                  <h2 className="font-semibold text-sm text-gray-900">
+                    {selectedUser ? `${selectedUser}'s Current Stock` : 'Current Stock'}
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Today's inventory levels</p>
+                </div>
+                {selectedUser && (
+                  <button 
+                    onClick={() => handleUserPanelAccess(selectedUser, 'summary')}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? "bg-amber-400 text-white" : i === 1 ? "bg-gray-400 text-white" : i === 2 ? "bg-amber-700 text-white" : "bg-gray-100 text-gray-500"}`}>{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
-                      <p className="text-xs text-gray-400">{u.count} items</p>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900">Rs {u.total.toFixed(0)}</span>
+                    View Details →
                   </button>
-                ))}
+                )}
+              </div>
+              <div className="p-4">
+                {selectedUser ? (
+                  <UserStockDisplay username={selectedUser} />
+                ) : (
+                  <div className="text-center py-8">
+                    <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Select a user to view their current stock</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

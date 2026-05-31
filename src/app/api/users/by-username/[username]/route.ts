@@ -5,12 +5,29 @@ import prisma from "@/lib/prisma";
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-export const GET = withAdmin(async (request: NextRequest, user, { params }) => {
+type RouteContext = {
+  params: Promise<{ username: string }>;
+};
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  // Handle authentication manually since withAdmin might not work with new App Router params
+  const authResult = await import("@/lib/api-auth").then(auth => auth.requireAdmin(request));
+  
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   try {
-    const username = decodeURIComponent(params.username as string);
+    const { username } = await context.params;
+    
+    if (!username) {
+      return Response.json({ error: "Username parameter is required" }, { status: 400 });
+    }
+
+    const decodedUsername = decodeURIComponent(username);
 
     const targetUser = await prisma.user.findUnique({
-      where: { username: username },
+      where: { username: decodedUsername },
       select: {
         id: true,
         username: true,
@@ -29,4 +46,4 @@ export const GET = withAdmin(async (request: NextRequest, user, { params }) => {
     console.error("[GET /api/users/by-username/[username]]", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
-});
+}

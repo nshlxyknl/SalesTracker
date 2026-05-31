@@ -9,6 +9,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
+    const date = url.searchParams.get('date');
 
     // If userId is specified, check ownership or admin access
     if (userId) {
@@ -21,8 +22,19 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     const isAdmin = user.role === "admin";
     const targetUserId = userId || user.id;
 
+    // Build where clause
+    const whereClause: any = isAdmin && !userId ? {} : { userId: targetUserId };
+
+    // Add date filter if provided
+    if (date) {
+      whereClause.createdAt = {
+        gte: new Date(date + 'T00:00:00.000Z'),
+        lt: new Date(date + 'T23:59:59.999Z')
+      };
+    }
+
     const sales = await prisma.sale.findMany({
-      where: isAdmin && !userId ? undefined : { userId: targetUserId },
+      where: whereClause,
       include: { user: { select: { username: true } } },
       orderBy: { createdAt: "desc" },
     });

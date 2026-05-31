@@ -16,13 +16,9 @@ import {
   Trash2, 
   Save, 
   Eye,
-  Calendar,
-  TrendingUp,
   CheckCircle,
   AlertCircle,
-  ArrowLeft,
-  Clock,
-  DollarSign
+  ArrowLeft
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -38,6 +34,7 @@ type VanLoad = {
   returned: number;
   userId: string;
   date: string;
+  createdAt: string;
   user: { username: string };
 };
 
@@ -193,8 +190,6 @@ export default function UserPanelPage() {
   })();
 
   const hasAssignedStock = vanLoads.length > 0;
-  const hasSales = sales.length > 0;
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
 
   const addStockItem = () => {
     setStockItems(prev => [...prev, { itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }]);
@@ -218,6 +213,11 @@ export default function UserPanelPage() {
   };
 
   const handleAssignStock = async () => {
+    if (!user?.id) {
+      setMessage({ type: "error", text: "User not found. Please refresh the page." });
+      return;
+    }
+
     const validItems = stockItems.filter(item => calculateTotalBottles(item) > 0);
     if (validItems.length === 0) {
       setMessage({ type: "error", text: "Please add at least one item with quantity > 0" });
@@ -228,22 +228,31 @@ export default function UserPanelPage() {
     setMessage(null);
 
     try {
+      const requestBody = {
+        userId: user.id,
+        date: selectedDate,
+        items: validItems.map(item => ({
+          itemName: item.itemName,
+          loaded: calculateTotalBottles(item),
+          returned: 0
+        }))
+      };
+
       const res = await fetch("/api/van-load", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user?.id,
-          date: selectedDate,
-          items: validItems.map(item => ({
-            itemName: item.itemName,
-            loaded: calculateTotalBottles(item),
-            returned: 0
-          }))
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (res.ok) {
-        setMessage({ type: "success", text: "Stock assigned successfully!" });
+        const data = await res.json();
+        const itemCount = validItems.length;
+        const assignmentNumber = vanLoads.length > 0 ? vanLoads.length + 1 : 1;
+        
+        setMessage({ 
+          type: "success", 
+          text: `Load #${assignmentNumber} added successfully! (${itemCount} item${itemCount > 1 ? 's' : ''})` 
+        });
         setStockItems([{ itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }]);
         queryClient.invalidateQueries({ queryKey: ["van-loads-user", user?.id, selectedDate] });
         setActiveTab("summary"); // Switch to summary tab after assignment
@@ -255,29 +264,6 @@ export default function UserPanelPage() {
       setMessage({ type: "error", text: "Network error occurred" });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleUpdateReturns = async (itemName: string, returnedQuantity: number) => {
-    try {
-      const load = vanLoads.find(l => l.itemName === itemName);
-      if (!load) return;
-
-      const res = await fetch("/api/van-load", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: load.id,
-          returned: returnedQuantity
-        })
-      });
-
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ["van-loads-user", user?.id, selectedDate] });
-        setMessage({ type: "success", text: "Returns updated successfully!" });
-      }
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to update returns" });
     }
   };
 
@@ -313,72 +299,14 @@ export default function UserPanelPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Stock Status</p>
-                <p className="text-2xl font-bold">
-                  {hasAssignedStock ? "Assigned" : "Not Assigned"}
-                </p>
-              </div>
-              <Package className={`h-8 w-8 ${hasAssignedStock ? 'text-green-600' : 'text-gray-400'}`} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-2xl font-bold">{sales.length}</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                <p className="text-2xl font-bold">Rs {totalRevenue.toFixed(2)}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Items Remaining</p>
-                <p className="text-2xl font-bold">
-                  {stockSummary.reduce((sum, item) => sum + Math.max(0, item.remaining), 0)}
-                </p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Tab Navigation */}
       <div className="flex gap-2">
         <button
           onClick={() => setActiveTab("assign")}
-          disabled={hasAssignedStock}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === "assign"
               ? "bg-blue-100 text-blue-700 border border-blue-200"
-              : hasAssignedStock
-                ? "text-gray-400 cursor-not-allowed"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
           }`}
         >
           <Package className="w-4 h-4" />
@@ -388,40 +316,30 @@ export default function UserPanelPage() {
         
         <button
           onClick={() => setActiveTab("summary")}
-          disabled={!hasAssignedStock}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === "summary"
               ? "bg-green-100 text-green-700 border border-green-200"
-              : !hasAssignedStock
-                ? "text-gray-400 cursor-not-allowed"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
           }`}
         >
           <Eye className="w-4 h-4" />
           Stock Summary
-        </button>
-        
-        <button
-          onClick={() => setActiveTab("returns")}
-          disabled={!hasSales}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === "returns"
-              ? "bg-orange-100 text-orange-700 border border-orange-200"
-              : !hasSales
-                ? "text-gray-400 cursor-not-allowed"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          Manage Returns
+          {hasAssignedStock && <CheckCircle className="w-4 h-4 text-green-600" />}
         </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === "assign" && !hasAssignedStock && (
+      {activeTab === "assign" && (
         <Card>
           <CardHeader>
-            <CardTitle>Assign Stock to {user?.username}</CardTitle>
+            <CardTitle>
+              {hasAssignedStock ? `Add More Stock to ${user?.username}` : `Assign Stock to ${user?.username}`}
+            </CardTitle>
+            {hasAssignedStock && (
+              <p className="text-sm text-gray-600">
+                {user?.username} already has stock assigned for {selectedDate}. You can add more items below.
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
@@ -499,9 +417,9 @@ export default function UserPanelPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button onClick={handleAssignStock} disabled={saving}>
+              <Button onClick={handleAssignStock} disabled={saving || !user?.id}>
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? "Assigning..." : "Assign Stock"}
+                {saving ? "Assigning..." : hasAssignedStock ? "Add More Stock" : "Assign Stock"}
               </Button>
               
               {message && (
@@ -516,149 +434,149 @@ export default function UserPanelPage() {
         </Card>
       )}
 
-      {activeTab === "summary" && hasAssignedStock && (
+      {activeTab === "summary" && (
         <Card>
           <CardHeader>
             <CardTitle>Stock Summary - {user?.username} ({selectedDate})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Item</th>
-                    <th className="text-right p-2">Loaded</th>
-                    <th className="text-right p-2">Sold</th>
-                    <th className="text-right p-2">Remaining</th>
-                    <th className="text-right p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stockSummary.map(item => {
-                    const itemConfig = getItemByName(item.itemName);
-                    const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
-                    
-                    return (
-                      <tr key={item.itemName} className="border-b">
-                        <td className="p-2 font-medium">{item.itemName}</td>
-                        <td className="p-2 text-right">
-                          {formatCaseBottleDisplay(item.loaded, bottlesPerCase)}
-                        </td>
-                        <td className="p-2 text-right">
-                          {formatCaseBottleDisplay(item.sold, bottlesPerCase)}
-                        </td>
-                        <td className={`p-2 text-right font-bold ${
-                          item.remaining >= 0 ? 'text-green-700' : 'text-red-700'
-                        }`}>
-                          {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
-                        </td>
-                        <td className="p-2 text-right">
-                          {item.remaining > 0 ? (
-                            <span className="text-green-600">✓</span>
-                          ) : item.remaining === 0 ? (
-                            <span className="text-blue-600">Sold Out</span>
-                          ) : (
-                            <span className="text-red-600">Over Sold</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === "returns" && hasSales && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Manage Returns - {user?.username} ({selectedDate})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {stockSummary.map(item => {
-                const itemConfig = getItemByName(item.itemName);
-                const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
-                const load = vanLoads.find(l => l.itemName === item.itemName);
+            {!hasAssignedStock ? (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-orange-400 mx-auto mb-4" />
+                <p className="text-gray-700 font-medium mb-2">No Stock Assigned for {selectedDate}</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Please assign stock to {user?.username} for this date first, or select a different date.
+                </p>
+                <Button 
+                  onClick={() => setActiveTab("assign")}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  Assign Stock
+                </Button>
+              </div>
+            ) : stockSummary.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 mb-2">No stock data found for this date</p>
+                <p className="text-sm text-gray-400">Try selecting a different date or assign stock first</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Item</th>
+                      <th className="text-right p-2">Previously Added</th>
+                      <th className="text-right p-2">Total Loaded</th>
+                      <th className="text-right p-2">Sold</th>
+                      <th className="text-right p-2">To Return</th>
+                      <th className="text-right p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stockSummary.map(item => {
+                      const itemConfig = getItemByName(item.itemName);
+                      const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                      
+                      // Get all loads for this item to show individual assignments
+                      const itemLoads = vanLoads.filter(load => load.itemName === item.itemName);
+                      
+                      return (
+                        <tr key={item.itemName} className="border-b">
+                          <td className="p-2 font-medium align-top">{item.itemName}</td>
+                          <td className="p-2 text-right align-top">
+                            <div className="space-y-1">
+                              {itemLoads.length > 0 ? (
+                                <>
+                                  {itemLoads.map((load, index) => (
+                                    <div key={load.id} className="text-xs border-b border-gray-100 pb-1 mb-1 last:border-b-0">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-gray-500">Load #{index + 1}:</span>
+                                        <span className="font-medium text-gray-700">
+                                          {formatCaseBottleDisplay(load.loaded, bottlesPerCase)}
+                                        </span>
+                                      </div>
+                                      <div className="text-gray-400 text-xs">
+                                        {new Date(load.createdAt).toLocaleTimeString([], { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <div className="text-xs font-medium text-blue-600 pt-1 border-t border-blue-100">
+                                    {itemLoads.length} assignment{itemLoads.length > 1 ? 's' : ''}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-xs text-gray-400">No loads</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-2 text-right align-top font-medium">
+                            {formatCaseBottleDisplay(item.loaded, bottlesPerCase)}
+                          </td>
+                          <td className="p-2 text-right align-top">
+                            {formatCaseBottleDisplay(item.sold, bottlesPerCase)}
+                          </td>
+                          <td className={`p-2 text-right font-bold align-top ${
+                            item.remaining >= 0 ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
+                          </td>
+                          <td className="p-2 text-right align-top">
+                            {item.remaining > 0 ? (
+                              <span className="text-green-600 text-xs">✓ Good</span>
+                            ) : item.remaining === 0 ? (
+                              <span className="text-blue-600 text-xs">Sold Out</span>
+                            ) : (
+                              <span className="text-red-600 text-xs">Over Sold</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
                 
-                return (
-                  <div key={item.itemName} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{item.itemName}</h4>
-                      <p className="text-sm text-gray-600">
-                        Remaining: {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
+                {/* Summary Row */}
+                {stockSummary.length > 0 && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-4 gap-4 text-sm">
                       <div>
-                        <Label>Returned Quantity</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max={item.remaining}
-                          value={item.returned}
-                          onChange={(e) => {
-                            const returned = parseInt(e.target.value) || 0;
-                            if (returned <= item.remaining) {
-                              handleUpdateReturns(item.itemName, returned);
-                            }
-                          }}
-                          className="w-24"
-                        />
+                        <span className="font-medium text-gray-700">Total Assignments:</span>
+                        <div className="text-lg font-bold text-purple-600">
+                          {vanLoads.length} loads
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Max: {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
+                      <div>
+                        <span className="font-medium text-gray-700">Total Loaded:</span>
+                        <div className="text-lg font-bold text-blue-600">
+                          {stockSummary.reduce((sum, item) => sum + item.loaded, 0)} bottles
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Total Sold:</span>
+                        <div className="text-lg font-bold text-orange-600">
+                          {stockSummary.reduce((sum, item) => sum + item.sold, 0)} bottles
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Total To Return:</span>
+                        <div className={`text-lg font-bold ${
+                          stockSummary.reduce((sum, item) => sum + item.remaining, 0) >= 0 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {stockSummary.reduce((sum, item) => sum + item.remaining, 0)} bottles
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Status Messages */}
-      {activeTab === "assign" && hasAssignedStock && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 text-green-700">
-              <CheckCircle className="h-6 w-6" />
-              <div>
-                <p className="font-medium">Stock Already Assigned</p>
-                <p className="text-sm text-gray-600">Stock has been assigned to {user?.username} for {selectedDate}. Use the Summary tab to view details.</p>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === "summary" && !hasAssignedStock && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 text-orange-700">
-              <AlertCircle className="h-6 w-6" />
-              <div>
-                <p className="font-medium">No Stock Assigned</p>
-                <p className="text-sm text-gray-600">Please assign stock to {user?.username} first using the Assign Stock tab.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === "returns" && !hasSales && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 text-blue-700">
-              <AlertCircle className="h-6 w-6" />
-              <div>
-                <p className="font-medium">No Sales Yet</p>
-                <p className="text-sm text-gray-600">{user?.username} hasn't made any sales yet for {selectedDate}. Returns can be managed after sales are recorded.</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

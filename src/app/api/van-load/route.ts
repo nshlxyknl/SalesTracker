@@ -36,11 +36,7 @@ export const GET = withAdmin(async (request: NextRequest, user) => {
 
 export const POST = withAdmin(async (request: NextRequest, user) => {
   try {
-    console.log("POST /api/van-load - Starting request");
-    console.log("Authentication successful");
-
     const body = await request.json();
-    console.log("Request body:", body);
     
     const { userId, date, items } = body as {
       userId: string;
@@ -51,10 +47,6 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
     if (!userId || !date || !items?.length) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
-
-    console.log("Validation passed, checking Prisma client...");
-    console.log("Prisma client:", typeof prisma);
-    console.log("Prisma vanLoad:", typeof prisma?.vanLoad);
 
     if (!prisma) {
       console.error("Prisma client is null/undefined");
@@ -68,18 +60,9 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
 
     const loadDate = new Date(date);
 
-    // Delete existing loads for this user+date before reinserting (upsert behaviour)
-    const start = new Date(date); start.setHours(0, 0, 0, 0);
-    const end = new Date(date); end.setHours(23, 59, 59, 999);
-    
-    console.log("Attempting to delete existing loads...");
-    await prisma.vanLoad.deleteMany({
-      where: { userId, date: { gte: start, lte: end } },
-    });
-    console.log("Delete successful");
-
+    // Instead of deleting existing loads, we'll add new ones
+    // This allows multiple assignments per day to accumulate
     const created = [];
-    console.log("Creating new loads...");
     for (const item of items) {
       const load = await prisma.vanLoad.create({
         data: {
@@ -92,7 +75,6 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
       });
       created.push(load);
     }
-    console.log("Created loads:", created.length);
 
     return Response.json(created, { status: 201 });
   } catch (err) {
