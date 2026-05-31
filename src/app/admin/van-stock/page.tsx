@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ITEMS } from "@/app/lib/items";
+import { ITEMS, formatCaseBottleDisplay, getItemByName } from "@/app/lib/items";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle2, Plus, Trash2, Sun, Moon } from "lucide-react";
 
@@ -398,7 +398,11 @@ export default function VanStockPage() {
                         </div>
                         <div className="col-span-2">
                           <div className="text-sm text-gray-600 px-2 py-2 bg-gray-50 rounded">
-                            {load?.loaded || 0}
+                            {(() => {
+                              const itemConfig = getItemByName(row.itemName);
+                              const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                              return formatCaseBottleDisplay(load?.loaded || 0, bottlesPerCase);
+                            })()}
                           </div>
                         </div>
                         <div className="col-span-2">
@@ -484,12 +488,44 @@ export default function VanStockPage() {
                     return (
                       <tr key={r.itemName} className={hasGap ? (r.missingQty > 0 ? "bg-red-50" : "bg-blue-50") : "hover:bg-gray-50"}>
                         <td className="px-4 py-3 font-medium text-gray-900">{r.itemName}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.loaded}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.returned}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.expectedSold}</td>
-                        <td className="px-4 py-3 text-gray-600">{r.actualSold}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {(() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return formatCaseBottleDisplay(r.loaded, bottlesPerCase);
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {(() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return formatCaseBottleDisplay(r.returned, bottlesPerCase);
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {(() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return formatCaseBottleDisplay(r.expectedSold, bottlesPerCase);
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {(() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return formatCaseBottleDisplay(r.actualSold, bottlesPerCase);
+                          })()}
+                        </td>
                         <td className={`px-4 py-3 font-semibold ${r.missingQty > 0 ? "text-red-600" : r.missingQty < 0 ? "text-blue-600" : "text-emerald-600"}`}>
-                          {r.missingQty > 0 ? `${r.missingQty} missing` : r.missingQty < 0 ? `${Math.abs(r.missingQty)} extra` : "✓"}
+                          {r.missingQty > 0 ? (() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return `${formatCaseBottleDisplay(r.missingQty, bottlesPerCase)} missing`;
+                          })() : r.missingQty < 0 ? (() => {
+                            const itemConfig = getItemByName(r.itemName);
+                            const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                            return `${formatCaseBottleDisplay(Math.abs(r.missingQty), bottlesPerCase)} extra`;
+                          })() : "✓"}
                         </td>
                       </tr>
                     );
@@ -498,10 +534,50 @@ export default function VanStockPage() {
                 <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                   <tr>
                     <td className="px-4 py-3 font-bold text-gray-900" colSpan={3}>Total</td>
-                    <td className="px-4 py-3 font-bold text-gray-900">{recRows.reduce((a, r) => a + r.expectedSold, 0)}</td>
-                    <td className="px-4 py-3 font-bold text-gray-900">{recRows.reduce((a, r) => a + r.actualSold, 0)}</td>
+                    <td className="px-4 py-3 font-bold text-gray-900">
+                      {(() => {
+                        const totalExpected = recRows.reduce((a, r) => a + r.expectedSold, 0);
+                        // Use the first item's case info for total display (or could be more sophisticated)
+                        const firstItem = recRows[0];
+                        if (firstItem) {
+                          const itemConfig = getItemByName(firstItem.itemName);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          return formatCaseBottleDisplay(totalExpected, bottlesPerCase);
+                        }
+                        return totalExpected;
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900">
+                      {(() => {
+                        const totalActual = recRows.reduce((a, r) => a + r.actualSold, 0);
+                        // Use the first item's case info for total display
+                        const firstItem = recRows[0];
+                        if (firstItem) {
+                          const itemConfig = getItemByName(firstItem.itemName);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          return formatCaseBottleDisplay(totalActual, bottlesPerCase);
+                        }
+                        return totalActual;
+                      })()}
+                    </td>
                     <td className={`px-4 py-3 font-bold ${totalMissingQty > 0 ? "text-red-600" : totalMissingQty < 0 ? "text-blue-600" : "text-emerald-600"}`}>
-                      {totalMissingQty > 0 ? `${totalMissingQty} missing` : totalMissingQty < 0 ? `${Math.abs(totalMissingQty)} extra` : "✓"}
+                      {totalMissingQty > 0 ? (() => {
+                        const firstItem = recRows[0];
+                        if (firstItem) {
+                          const itemConfig = getItemByName(firstItem.itemName);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          return `${formatCaseBottleDisplay(totalMissingQty, bottlesPerCase)} missing`;
+                        }
+                        return `${totalMissingQty} missing`;
+                      })() : totalMissingQty < 0 ? (() => {
+                        const firstItem = recRows[0];
+                        if (firstItem) {
+                          const itemConfig = getItemByName(firstItem.itemName);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          return `${formatCaseBottleDisplay(Math.abs(totalMissingQty), bottlesPerCase)} extra`;
+                        }
+                        return `${Math.abs(totalMissingQty)} extra`;
+                      })() : "✓"}
                     </td>
                   </tr>
                 </tfoot>

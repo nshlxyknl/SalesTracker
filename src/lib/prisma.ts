@@ -21,9 +21,11 @@ function createPrismaClient() {
     
     const adapter = new PrismaPg(pool);
 
+    const shouldLogQueries = process.env.PRISMA_QUERY_LOGGING === "true" && process.env.NODE_ENV === "development";
+    
     return new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      log: shouldLogQueries ? ["query", "error", "warn"] : ["error"],
     });
   } catch (error) {
     console.error("Failed to create Prisma client:", error);

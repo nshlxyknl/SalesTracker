@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ITEMS } from "@/app/lib/items";
+import { ITEMS, formatCaseBottleDisplay, getItemByName, convertBottlesToCases } from "@/app/lib/items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, LogOut, ShieldCheck } from "lucide-react";
+import { BarChart3, LogOut, ShieldCheck, Package, AlertCircle, CheckCircle } from "lucide-react";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 
 type Sale = {
@@ -24,12 +24,30 @@ type Sale = {
   createdAt: string;
 };
 
+type UserStock = {
+  itemName: string;
+  loaded: number;
+  sold: number;
+  remaining: number;
+  returned: number;
+};
+
+type StockResponse = {
+  date: string;
+  stock: UserStock[];
+  hasStock: boolean;
+  totalItems: number;
+};
+
 type LineItem = {
   id: number;
   item: (typeof ITEMS)[0];
   variant: (typeof ITEMS)[0]["variants"][0];
-  quantity: number | "";
-  amount: number | "";
+  cases: number | "";
+  bottles: number | "";
+  casePrice: number | ""; // Allow empty string for erasable input
+  totalQuantity: number; // Total bottles for backend
+  totalAmount: number; // Total price
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -43,8 +61,11 @@ const newLine = (): LineItem => ({
   id: nextId++,
   item: ITEMS[0],
   variant: ITEMS[0].variants[0],
-  quantity: 1,
-  amount: ITEMS[0].variants[0].price,
+  cases: "",
+  bottles: "",
+  casePrice: "", // Start with empty string for erasable input
+  totalQuantity: 0,
+  totalAmount: 0,
 });
 
 async function fetchSales(): Promise<Sale[]> {
@@ -64,6 +85,16 @@ export default function DashboardPage() {
     enabled: !!session?.user,
   });
 
+  const { data: stockData, isLoading: stockLoading } = useQuery<StockResponse>({
+    queryKey: ["user-stock", new Date().toISOString().split('T')[0]],
+    queryFn: async () => {
+      const res = await fetch("/api/user-stock");
+      if (!res.ok) throw new Error("Failed to fetch stock");
+      return res.json();
+    },
+    enabled: !!session?.user,
+  });
+
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
   const [billTitle, setBillTitle] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "cheque" | "credit">("cash");
@@ -74,6 +105,24 @@ export default function DashboardPage() {
   const [billPreviewModal, setBillPreviewModal] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Calculate total quantity and amount for a line item
+  const calculateLineItem = (line: LineItem) => {
+    const cases = Number(line.cases) || 0;
+    const bottles = Number(line.bottles) || 0;
+    const casePrice = Number(line.casePrice) || 0;
+    const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+    
+    const totalQuantity = (cases * bottlesPerCase) + bottles;
+    
+    // Calculate bottle price: case_rate ÷ bottles_per_case
+    const bottlePrice = bottlesPerCase > 0 ? casePrice / bottlesPerCase : 0;
+    
+    // Total amount = (cases × case_price) + (bottles × bottle_price)
+    const totalAmount = (cases * casePrice) + (bottles * bottlePrice);
+    
+    return { totalQuantity, totalAmount, bottlePrice };
+  };
+
   useEffect(() => {
     if (!isPending && !session?.user) router.push("/login");
     if (!isPending && session?.user) {
@@ -83,10 +132,17 @@ export default function DashboardPage() {
   }, [isPending, session, router]);
 
   function updateLine(id: number, patch: Partial<LineItem>) {
-    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setLines((prev) => prev.map((l) => {
+      if (l.id === id) {
+        const updatedLine = { ...l, ...patch };
+        const { totalQuantity, totalAmount } = calculateLineItem(updatedLine);
+        return { ...updatedLine, totalQuantity, totalAmount };
+      }
+      return l;
+    }));
   }
 
-  const grandTotal = lines.reduce((sum, l) => sum + (Number(l.amount) || 0) * (Number(l.quantity) || 0), 0);
+  const grandTotal = lines.reduce((sum, l) => sum + (l.totalAmount || 0), 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,8 +153,8 @@ export default function DashboardPage() {
     fd.append("billTitle", billTitle.trim());
     fd.append("items", JSON.stringify(lines.map((l) => ({
       itemName: l.item.name,
-      quantity: Number(l.quantity) || 1,
-      unitPrice: Number(l.amount) || l.variant.price,
+      quantity: l.totalQuantity,
+      unitPrice: l.totalQuantity > 0 ? l.totalAmount / l.totalQuantity : 0,
     }))));
     fd.append("paymentMethod", paymentMethod);
     if (billFile) fd.append("billImage", billFile);
@@ -114,6 +170,7 @@ export default function DashboardPage() {
       setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["user-stock"] }); // Refresh stock data
     } else {
       let msg = "Something went wrong.";
       try {
@@ -138,8 +195,83 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* Form */}
+        {/* Stock Display */}
         <div className="lg:col-span-2">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                My Stock
+              </h2>
+              {stockData && (
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  stockData.hasStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {stockData.hasStock ? (() => {
+                    // Calculate total in case/bottle format for display
+                    const totalBottles = stockData.totalItems;
+                    // Use first item's case info for total display (or use a common format)
+                    const firstStockItem = stockData.stock[0];
+                    if (firstStockItem) {
+                      const itemConfig = getItemByName(firstStockItem.itemName);
+                      const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                      return formatCaseBottleDisplay(totalBottles, bottlesPerCase);
+                    }
+                    return `${totalBottles} items available`;
+                  })() : 'No stock assigned'}
+                </span>
+              )}
+            </div>
+            
+            {stockLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : stockData?.hasStock ? (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {stockData.stock.map((item) => {
+                  const itemConfig = getItemByName(item.itemName);
+                  const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                  const loadedDisplay = formatCaseBottleDisplay(item.loaded, bottlesPerCase);
+                  const soldDisplay = formatCaseBottleDisplay(item.sold, bottlesPerCase);
+                  const returnedDisplay = formatCaseBottleDisplay(item.returned, bottlesPerCase);
+                  const remainingDisplay = formatCaseBottleDisplay(item.remaining, bottlesPerCase);
+                  
+                  return (
+                    <div key={item.itemName} className={`flex justify-between items-center p-3 rounded-lg ${
+                      item.remaining > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div>
+                        <p className="font-medium text-gray-900">{item.itemName}</p>
+                        <p className="text-xs text-gray-500">
+                          Loaded: {loadedDisplay} • Sold: {soldDisplay} • Returned: {returnedDisplay}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold ${item.remaining > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                          {remainingDisplay}
+                        </p>
+                        <p className="text-xs text-gray-500">remaining</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">No stock assigned for today</p>
+                <p className="text-gray-400 text-xs mt-1">Contact admin to get stock assigned</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sales Form */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold mb-5 text-gray-900">New Sale</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -158,59 +290,131 @@ export default function DashboardPage() {
 
               {/* Line items */}
               <div className="space-y-3">
-                {lines.map((line, idx) => (
-                  <div key={line.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400 font-medium">Item {idx + 1}</span>
-                      {lines.length > 1 && (
-                        <button type="button" onClick={() => setLines((p) => p.filter((l) => l.id !== line.id))} className="text-gray-300 hover:text-red-500 text-lg leading-none">&times;</button>
-                      )}
-                    </div>
-                    <select
-                      value={line.item.name}
-                      onChange={(e) => {
-                        const item = ITEMS.find((i) => i.name === e.target.value)!;
-                        updateLine(line.id, { item, variant: item.variants[0], amount: item.variants[0].price });
-                      }}
-                      className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    >
-                      {ITEMS.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
-                    </select>
-                    <div className="flex gap-2">
-                      <select
-                        value={line.variant.label}
-                        onChange={(e) => {
-                          const variant = line.item.variants.find((v) => v.label === e.target.value)!;
-                          updateLine(line.id, { variant, amount: variant.price });
-                        }}
-                        className="flex-1 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      >
-                        {line.item.variants.map((v) => <option key={v.label} value={v.label}>{v.label} — Rs {v.price}</option>)}
-                      </select>
-                      <input
-                        type="number" min={1} value={line.quantity} placeholder="Qty"
-                        onChange={(e) => updateLine(line.id, { quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                        onBlur={() => updateLine(line.id, { quantity: !line.quantity || Number(line.quantity) < 1 ? 1 : line.quantity })}
-                        className="w-20 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      />
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={line.amount}
-                        placeholder="Amount"
-                        onChange={(e) => updateLine(line.id, { amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                        onBlur={() => updateLine(line.id, { amount: !line.amount || Number(line.amount) < 0 ? line.variant.price : line.amount })}
-                        className="flex-1 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      />
-                      <div className="text-right text-xs text-gray-500 font-medium min-w-28">
-                        Total Rs {((Number(line.amount) || 0) * (Number(line.quantity) || 0)).toFixed(2)}
+                {lines.map((line, idx) => {
+                  const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+                  const { totalQuantity, totalAmount, bottlePrice } = calculateLineItem(line);
+                  const stockItem = stockData?.stock.find(s => s.itemName === line.item.name);
+                  const availableBottles = stockItem ? stockItem.remaining : 0;
+                  const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(availableBottles, bottlesPerCase);
+                  
+                  return (
+                    <div key={line.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400 font-medium">Item {idx + 1}</span>
+                        {lines.length > 1 && (
+                          <button type="button" onClick={() => setLines((p) => p.filter((l) => l.id !== line.id))} className="text-gray-300 hover:text-red-500 text-lg leading-none">&times;</button>
+                        )}
                       </div>
+                      
+                      <select
+                        value={line.item.name}
+                        onChange={(e) => {
+                          const item = ITEMS.find((i) => i.name === e.target.value)!;
+                          updateLine(line.id, { 
+                            item, 
+                            variant: item.variants[0], 
+                            cases: "",
+                            bottles: "",
+                            casePrice: ""
+                          });
+                        }}
+                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      >
+                        {ITEMS.map((item) => {
+                          const stockItem = stockData?.stock.find(s => s.itemName === item.name);
+                          const hasStock = stockItem && stockItem.remaining > 0;
+                          const itemConfig = getItemByName(item.name);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          const availableDisplay = stockItem ? formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase) : 'No stock';
+                          
+                          return (
+                            <option key={item.name} value={item.name} disabled={!hasStock}>
+                              {item.name} {stockItem ? `(${availableDisplay} available)` : '(No stock)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Cases</label>
+                          <input
+                            type="number" 
+                            min={0} 
+                            max={availableCases}
+                            value={line.cases} 
+                            placeholder="0"
+                            onChange={(e) => {
+                              const cases = e.target.value === "" ? "" : parseInt(e.target.value);
+                              updateLine(line.id, { cases });
+                            }}
+                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Bottles</label>
+                          <input
+                            type="number" 
+                            min={0} 
+                            max={(() => {
+                              const cases = Number(line.cases) || 0;
+                              if (cases >= availableCases) {
+                                return availableBottlesRemainder;
+                              }
+                              return bottlesPerCase - 1;
+                            })()} 
+                            value={line.bottles} 
+                            placeholder="0"
+                            onChange={(e) => {
+                              const bottles = e.target.value === "" ? "" : parseInt(e.target.value);
+                              updateLine(line.id, { bottles });
+                            }}
+                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Price per Case</label>
+                          <input
+                            type="number" 
+                            min={0} 
+                            step="0.01"
+                            value={line.casePrice} 
+                            placeholder="0.00"
+                            onChange={(e) => {
+                              const casePrice = e.target.value === "" ? "" : parseFloat(e.target.value);
+                              updateLine(line.id, { casePrice });
+                            }}
+                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-xs">
+                        <div className="text-gray-500">
+                          <div>1 case = {bottlesPerCase} bottles</div>
+                          <div>1 bottle = Rs {bottlePrice > 0 ? bottlePrice.toFixed(2) : '0.00'}</div>
+                        </div>
+                        <div className="text-right font-medium">
+                          <div>Qty: {totalQuantity} bottles</div>
+                          <div className="text-lg font-bold text-gray-900">Rs {totalAmount.toFixed(2)}</div>
+                        </div>
+                      </div>
+                      
+                      {(() => {
+                        if (stockItem && totalQuantity > stockItem.remaining) {
+                          return (
+                            <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                              ⚠️ Only {formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <button type="button" onClick={() => setLines((p) => [...p, newLine()])}

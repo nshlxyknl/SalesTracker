@@ -14,7 +14,9 @@ import {
   Download,
   ShieldCheck,
   User as UserIcon,
-  TrendingUp
+  TrendingUp,
+  Package,
+  UserPlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getNavItemsForUser, getDefaultRoute } from "@/lib/rbac";
@@ -29,6 +31,8 @@ const ICON_MAP = {
   ShieldCheck,
   UserIcon,
   TrendingUp,
+  Package,
+  UserPlus,
 } as const;
 
 interface RoleBasedNavProps {

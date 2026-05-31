@@ -63,6 +63,18 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     requiredPermissions: ['view_dashboard'],
   },
   {
+    label: 'Assign Stock',
+    href: '/admin/assign-stock',
+    icon: 'UserPlus',
+    requiredPermissions: ['manage_van_stock'],
+  },
+  {
+    label: 'Stock Management',
+    href: '/admin/stock-management',
+    icon: 'Package',
+    requiredPermissions: ['manage_van_stock'],
+  },
+  {
     label: 'Analytics',
     href: '/admin/analytics',
     icon: 'TrendingUp',
