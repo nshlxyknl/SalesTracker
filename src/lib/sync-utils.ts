@@ -121,6 +121,7 @@ export async function deleteVanLoadOffline(vanLoadId: string) {
 export async function createSaleOffline(saleData: {
   userId: string;
   billNumber: string;
+  billTitle: string;
   itemName: string;
   quantity: number;
   unitPrice: number;
@@ -144,6 +145,7 @@ export async function updateSaleOffline(saleData: {
   localId?: string;
   userId: string;
   billNumber: string;
+  billTitle: string;
   itemName: string;
   quantity: number;
   unitPrice: number;

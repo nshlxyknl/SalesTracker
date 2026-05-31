@@ -101,6 +101,12 @@ export async function signUp(username: string, password: string): Promise<AuthRe
       body: JSON.stringify({ username: username.toLowerCase().trim(), password })
     });
 
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return { success: false, error: 'Server returned invalid response format' };
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -126,6 +132,12 @@ export async function signIn(username: string, password: string): Promise<AuthRe
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.toLowerCase().trim(), password })
     });
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return { success: false, error: 'Server returned invalid response format' };
+    }
 
     const data = await response.json();
 
@@ -155,6 +167,13 @@ export async function getCurrentUser(): Promise<User | null> {
     const response = await fetch('/api/auth/me');
     
     if (!response.ok) {
+      return null;
+    }
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('getCurrentUser: Server returned non-JSON response');
       return null;
     }
 

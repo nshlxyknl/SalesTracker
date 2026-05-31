@@ -23,6 +23,7 @@ export interface User {
 export interface Sale {
   id: string;
   billNumber: string;
+  billTitle: string;
   itemName: string;
   quantity: number;
   unitPrice: number;
@@ -121,6 +122,7 @@ export interface CreateUserData {
 
 export interface CreateSaleData {
   billNumber?: string;
+  billTitle?: string;
   itemName: string;
   quantity: number;
   unitPrice: number;
@@ -174,6 +176,7 @@ export interface CreateReconciliationReportData {
 // Update Types
 export interface UpdateSaleData {
   billNumber?: string;
+  billTitle?: string;
   itemName?: string;
   quantity?: number;
   unitPrice?: number;

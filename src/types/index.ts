@@ -126,7 +126,6 @@ export interface UIState {
   isLoading: boolean;
   isOffline: boolean;
   theme: 'light' | 'dark' | 'system';
-  sidebarOpen: boolean;
   notifications: AppNotification[];
 }
 

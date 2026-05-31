@@ -378,6 +378,7 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
         data: {
           userId: userId,
           billNumber: data.billNumber || "",
+          billTitle: data.billTitle || "Untitled Bill",
           itemName: data.itemName,
           quantity: data.quantity,
           unitPrice: data.unitPrice,
@@ -395,6 +396,7 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
         where: { id: data.id },
         data: {
           billNumber: data.billNumber,
+          billTitle: data.billTitle,
           itemName: data.itemName,
           quantity: data.quantity,
           unitPrice: data.unitPrice,

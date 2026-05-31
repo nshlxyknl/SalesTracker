@@ -6,7 +6,7 @@ import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGuard requiredPermissions={['admin_access']} fallbackRoute="/dashboard">
-      <RoleBasedNav>
+      <RoleBasedNav showSidebar={false}>
         {children}
       </RoleBasedNav>
     </RoleGuard>

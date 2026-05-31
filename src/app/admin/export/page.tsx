@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Download, FileSpreadsheet, FileText, File } from "lucide-react";
+import { safeApiCall } from "@/lib/fetch-utils";
 
 interface User {
   id: string;
@@ -21,13 +22,23 @@ export default function ExportPage() {
     userId: ""
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load users
-    fetch("/api/users")
-      .then(res => res.json())
-      .then(setUsers)
-      .catch(console.error);
+    // Load users with safe API call
+    const loadUsers = async () => {
+      const result = await safeApiCall<User[]>("/api/users");
+      if (result.success && result.data) {
+        setUsers(result.data);
+        setError(null);
+      } else {
+        console.error("Failed to load users:", result.error);
+        setError(result.error || "Failed to load users");
+        setUsers([]);
+      }
+    };
+
+    loadUsers();
   }, []);
 
   const handleExport = async (format: string, reportType?: string) => {
@@ -88,6 +99,21 @@ export default function ExportPage() {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Export Bills & Reports</h1>
+      
+      {/* Error Display */}
+      {error && (
+        <Card className="mb-6 border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-red-700">
+              <span className="font-semibold">Error:</span>
+              <span>{error}</span>
+            </div>
+            <p className="text-sm text-red-600 mt-2">
+              This usually means you need to log in again or there's a server issue.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Filters */}
       <Card className="mb-6">

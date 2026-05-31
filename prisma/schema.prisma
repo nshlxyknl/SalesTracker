@@ -24,6 +24,7 @@ model User {
 model Sale {
   id              String   @id @default(cuid())
   billNumber      String   @default("")
+  billTitle       String   @default("")
   itemName        String
   quantity        Int
   unitPrice       Float

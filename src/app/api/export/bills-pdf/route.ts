@@ -146,6 +146,7 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
     // Detailed sales table
     const tableData = sales.map(sale => [
       sale.billNumber || "N/A",
+      sale.billTitle || "Untitled Bill",
       new Date(sale.createdAt).toLocaleDateString(),
       sale.user.username,
       sale.itemName,
@@ -156,20 +157,21 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
     ]);
 
     doc.autoTable({
-      head: [["Bill #", "Date", "User", "Item", "Qty", "Unit Price", "Total", "Payment"]],
+      head: [["Bill #", "Title", "Date", "User", "Item", "Qty", "Unit Price", "Total", "Payment"]],
       body: tableData,
       startY: yPosition,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [200, 200, 200] },
       columnStyles: {
         0: { cellWidth: 20 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 30 },
-        4: { cellWidth: 15 },
-        5: { cellWidth: 20 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 28 },
+        5: { cellWidth: 15 },
         6: { cellWidth: 20 },
-        7: { cellWidth: 25 }
+        7: { cellWidth: 20 },
+        8: { cellWidth: 22 }
       }
     });
 
@@ -181,6 +183,7 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
       if (!billsMap.has(billKey)) {
         billsMap.set(billKey, {
           billNumber: sale.billNumber,
+          billTitle: sale.billTitle,
           user: sale.user.username,
           date: sale.createdAt,
           paymentMethod: sale.paymentMethod,
@@ -195,6 +198,7 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
 
     const billTableData = Array.from(billsMap.values()).map(bill => [
       bill.billNumber || "N/A",
+      bill.billTitle || "Untitled Bill",
       new Date(bill.date).toLocaleDateString(),
       bill.user,
       bill.itemCount.toString(),
@@ -203,7 +207,7 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
     ]);
 
     doc.autoTable({
-      head: [["Bill Number", "Date", "User", "Items", "Total Amount", "Payment Method"]],
+      head: [["Bill Number", "Title", "Date", "User", "Items", "Total Amount", "Payment Method"]],
       body: billTableData,
       startY: yPosition,
       styles: { fontSize: 10 },

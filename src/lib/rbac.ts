@@ -63,6 +63,12 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     requiredPermissions: ['view_dashboard'],
   },
   {
+    label: 'Analytics',
+    href: '/admin/analytics',
+    icon: 'TrendingUp',
+    requiredPermissions: ['view_all_sales'],
+  },
+  {
     label: 'Van Stock',
     href: '/admin/van-stock',
     icon: 'Truck',

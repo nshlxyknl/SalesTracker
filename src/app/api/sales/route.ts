@@ -37,6 +37,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
 export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
   try {
     const formData = await request.formData();
+    const billTitle = ((formData.get("billTitle") as string) || "").trim() || "Untitled Bill";
     const itemsJson = formData.get("items") as string;
     const paymentMethod = formData.get("paymentMethod") as string;
     const billFile = formData.get("billImage") as File | null;
@@ -70,6 +71,7 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
       const sale = await prisma.sale.create({
         data: {
           billNumber,
+          billTitle,
           itemName: item.itemName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,

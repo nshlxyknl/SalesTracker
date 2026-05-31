@@ -10,11 +10,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, LogOut, ShieldCheck } from "lucide-react";
 import { RoleGuard } from "@/components/auth/RoleGuard";
-import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
 
 type Sale = {
   id: string;
   billNumber: string;
+  billTitle: string;
   itemName: string;
   quantity: number;
   unitPrice: number;
@@ -29,6 +29,7 @@ type LineItem = {
   item: (typeof ITEMS)[0];
   variant: (typeof ITEMS)[0]["variants"][0];
   quantity: number | "";
+  amount: number | "";
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -38,7 +39,13 @@ const PAYMENT_COLORS: Record<string, string> = {
 };
 
 let nextId = 1;
-const newLine = (): LineItem => ({ id: nextId++, item: ITEMS[0], variant: ITEMS[0].variants[0], quantity: 1 });
+const newLine = (): LineItem => ({
+  id: nextId++,
+  item: ITEMS[0],
+  variant: ITEMS[0].variants[0],
+  quantity: 1,
+  amount: ITEMS[0].variants[0].price,
+});
 
 async function fetchSales(): Promise<Sale[]> {
   const res = await fetch("/api/sales");
@@ -58,6 +65,7 @@ export default function DashboardPage() {
   });
 
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
+  const [billTitle, setBillTitle] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "cheque" | "credit">("cash");
   const [billFile, setBillFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,7 +86,7 @@ export default function DashboardPage() {
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   }
 
-  const grandTotal = lines.reduce((sum, l) => sum + l.variant.price * (Number(l.quantity) || 0), 0);
+  const grandTotal = lines.reduce((sum, l) => sum + (Number(l.amount) || 0) * (Number(l.quantity) || 0), 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,10 +94,11 @@ export default function DashboardPage() {
     setFormMsg(null);
 
     const fd = new FormData();
+    fd.append("billTitle", billTitle.trim());
     fd.append("items", JSON.stringify(lines.map((l) => ({
       itemName: l.item.name,
       quantity: Number(l.quantity) || 1,
-      unitPrice: l.variant.price,
+      unitPrice: Number(l.amount) || l.variant.price,
     }))));
     fd.append("paymentMethod", paymentMethod);
     if (billFile) fd.append("billImage", billFile);
@@ -100,6 +109,7 @@ export default function DashboardPage() {
     if (res.ok) {
       setFormMsg({ type: "success", text: "Sale recorded." });
       setLines([newLine()]);
+      setBillTitle("");
       setBillFile(null);
       setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -127,13 +137,24 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <RoleBasedNav>
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Form */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold mb-5 text-gray-900">New Sale</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+
+              <div>
+                <label className="block text-sm text-gray-600 font-medium mb-1.5">Bill Title</label>
+                <input
+                  type="text"
+                  value={billTitle}
+                  onChange={(e) => setBillTitle(e.target.value)}
+                  placeholder="e.g. April wholesale order"
+                  required
+                  className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
 
               {/* Line items */}
               <div className="space-y-3">
@@ -149,7 +170,7 @@ export default function DashboardPage() {
                       value={line.item.name}
                       onChange={(e) => {
                         const item = ITEMS.find((i) => i.name === e.target.value)!;
-                        updateLine(line.id, { item, variant: item.variants[0] });
+                        updateLine(line.id, { item, variant: item.variants[0], amount: item.variants[0].price });
                       }}
                       className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                     >
@@ -158,7 +179,10 @@ export default function DashboardPage() {
                     <div className="flex gap-2">
                       <select
                         value={line.variant.label}
-                        onChange={(e) => updateLine(line.id, { variant: line.item.variants.find((v) => v.label === e.target.value)! })}
+                        onChange={(e) => {
+                          const variant = line.item.variants.find((v) => v.label === e.target.value)!;
+                          updateLine(line.id, { variant, amount: variant.price });
+                        }}
                         className="flex-1 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                       >
                         {line.item.variants.map((v) => <option key={v.label} value={v.label}>{v.label} — Rs {v.price}</option>)}
@@ -170,8 +194,20 @@ export default function DashboardPage() {
                         className="w-20 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                       />
                     </div>
-                    <div className="text-right text-xs text-gray-500 font-medium">
-                      Rs {(line.variant.price * (Number(line.quantity) || 0)).toFixed(2)}
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.amount}
+                        placeholder="Amount"
+                        onChange={(e) => updateLine(line.id, { amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                        onBlur={() => updateLine(line.id, { amount: !line.amount || Number(line.amount) < 0 ? line.variant.price : line.amount })}
+                        className="flex-1 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      />
+                      <div className="text-right text-xs text-gray-500 font-medium min-w-28">
+                        Total Rs {((Number(line.amount) || 0) * (Number(line.quantity) || 0)).toFixed(2)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -278,7 +314,7 @@ export default function DashboardPage() {
                 <table className="w-full text-sm">
                   <thead className="text-xs text-gray-500 uppercase bg-gray-50">
                     <tr>
-                      {["SN", "Item", "Qty", "Unit", "Total", "Payment", "Date", "Bill"].map((h) => (
+                      {["SN", "Title", "Item", "Qty", "Unit", "Total", "Payment", "Date", "Bill"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
                       ))}
                     </tr>
@@ -287,6 +323,7 @@ export default function DashboardPage() {
                     {sales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-xs font-mono text-gray-500">{sale.billNumber}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{sale.billTitle || "Untitled Bill"}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{sale.itemName}</td>
                         <td className="px-4 py-3 text-gray-500">{sale.quantity}</td>
                         <td className="px-4 py-3 text-gray-500">Rs {sale.unitPrice.toFixed(2)}</td>
@@ -309,7 +346,6 @@ export default function DashboardPage() {
           </div>
         </div>
         </div>
-      </RoleBasedNav>
 
       {billPreviewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setBillPreviewModal(null)}>

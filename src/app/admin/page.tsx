@@ -11,6 +11,7 @@ import QuickExportDropdown from "@/components/quick-export-dropdown";
 type Sale = {
   id: string;
   billNumber: string;
+  billTitle: string;
   itemName: string;
   quantity: number;
   unitPrice: number;
@@ -23,6 +24,7 @@ type Sale = {
 
 type Bill = {
   billNumber: string;
+  billTitle: string;
   user: { username: string };
   paymentMethod: string;
   billTotal: number;
@@ -50,6 +52,7 @@ function groupIntoBills(sales: Sale[]): Bill[] {
     if (!map.has(key)) {
       map.set(key, {
         billNumber: sale.billNumber || sale.id,
+        billTitle: sale.billTitle || "Untitled Bill",
         user: sale.user ?? { name: "Unknown", email: "" },
         paymentMethod: sale.paymentMethod,
         billTotal: 0,
@@ -100,6 +103,7 @@ export default function AdminPage() {
   const filtered = bills.filter((b) => {
     const matchSearch =
       (b.billNumber ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (b.billTitle ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (b.user?.username ?? "").toLowerCase().includes(search.toLowerCase()) ||
       b.items.some((i) => (i.itemName ?? "").toLowerCase().includes(search.toLowerCase()));
     const matchPayment = filterPayment === "all" || b.paymentMethod === filterPayment;
@@ -131,12 +135,22 @@ export default function AdminPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => router.push('/admin/analytics')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            View Detailed Analytics
+          </button>
+        </div>
+      </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-2">
               <Skeleton className="h-3 w-20" /><Skeleton className="h-8 w-28" /><Skeleton className="h-3 w-14" />
             </div>
@@ -144,6 +158,7 @@ export default function AdminPage() {
         ) : (
           [
             { label: "Total Revenue", value: `Rs ${totalRevenue.toFixed(2)}`, sub: `${bills.length} bills`, color: "from-gray-800 to-gray-900" },
+            { label: "Total Users", value: `${byUser.length}`, sub: `Active sellers`, color: "from-blue-600 to-blue-700" },
             { label: "Cash", value: `Rs ${byCash.toFixed(2)}`, sub: `${sales.filter(s => s.paymentMethod === "cash").length} items`, color: "from-emerald-600 to-emerald-700" },
             { label: "Cheque", value: `Rs ${byCheque.toFixed(2)}`, sub: `${sales.filter(s => s.paymentMethod === "cheque").length} items`, color: "from-amber-500 to-amber-600" },
             { label: "Credit", value: `Rs ${byCredit.toFixed(2)}`, sub: `${sales.filter(s => s.paymentMethod === "credit").length} items`, color: "from-purple-600 to-purple-700" },
@@ -204,6 +219,7 @@ export default function AdminPage() {
                     <button onClick={() => toggleExpand(bill.billNumber)} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left">
                       {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
                       <span className="font-mono text-sm font-semibold text-gray-900 w-16 flex-shrink-0">#{bill.billNumber}</span>
+                      <span className="text-sm text-gray-900 font-medium flex-1 truncate">{bill.billTitle}</span>
                       <span className="text-sm text-gray-600 flex-1 truncate">{bill.user.username}</span>
                       <span className="text-xs text-gray-400 hidden sm:block w-20 flex-shrink-0">{bill.items.length} item{bill.items.length > 1 ? "s" : ""}</span>
                       <span className="font-semibold text-gray-900 w-28 text-right flex-shrink-0">Rs {bill.billTotal.toFixed(2)}</span>
@@ -245,8 +261,14 @@ export default function AdminPage() {
 
         {/* Leaderboard */}
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-sm text-gray-900">Top Sellers</h2>
+            <button 
+              onClick={() => router.push('/admin/analytics')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View All →
+            </button>
           </div>
           <div className="p-4 space-y-3">
             {isLoading ? (

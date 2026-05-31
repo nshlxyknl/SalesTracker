@@ -51,6 +51,11 @@ class IndexedDBManager implements OfflineStorageManager {
       return this.dbPromise;
     }
 
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+      throw new Error('IndexedDB not available in this environment');
+    }
+
     this.dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -383,15 +388,24 @@ export function generateLocalId(): string {
 }
 
 export function isOnline(): boolean {
+  if (typeof navigator === 'undefined') {
+    return true; // Assume online during SSR
+  }
   return navigator.onLine;
 }
 
 export function addOnlineListener(callback: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}; // No-op during SSR
+  }
   window.addEventListener('online', callback);
   return () => window.removeEventListener('online', callback);
 }
 
 export function addOfflineListener(callback: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}; // No-op during SSR
+  }
   window.addEventListener('offline', callback);
   return () => window.removeEventListener('offline', callback);
 }

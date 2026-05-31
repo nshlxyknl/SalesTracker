@@ -68,6 +68,11 @@ export class SyncManager implements ISyncManager {
    * Initialize connectivity event listeners
    */
   private initializeConnectivityListeners(): void {
+    // Only initialize listeners in browser environment
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     this.onlineListener = addOnlineListener(() => {
       console.log('[SyncManager] Device came online, triggering sync');
       this.handleConnectivityChange(true);
@@ -83,6 +88,11 @@ export class SyncManager implements ISyncManager {
    * Start automatic sync timer
    */
   private startAutoSync(): void {
+    // Only start auto sync in browser environment
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     if (this.autoSyncTimer) {
       clearInterval(this.autoSyncTimer);
     }
@@ -613,12 +623,21 @@ export class SyncManager implements ISyncManager {
   }
 }
 
-// Export singleton instance
-export const syncManager = SyncManager.getInstance();
+// Export singleton instance (lazy initialization)
+let syncManagerInstance: SyncManager | null = null;
+
+export const syncManager = {
+  getInstance(): SyncManager {
+    if (!syncManagerInstance) {
+      syncManagerInstance = SyncManager.getInstance();
+    }
+    return syncManagerInstance;
+  }
+};
 
 // Utility functions for easy access
 export function queueSyncOperation(operation: Omit<SyncOperation, 'id' | 'timestamp' | 'retryCount'>): Promise<void> {
-  return syncManager.queueOperation({
+  return syncManager.getInstance().queueOperation({
     id: generateLocalId(),
     timestamp: Date.now(),
     retryCount: 0,
@@ -628,9 +647,9 @@ export function queueSyncOperation(operation: Omit<SyncOperation, 'id' | 'timest
 }
 
 export function getSyncStatus(): Promise<QueueStatus> {
-  return syncManager.getQueueStatus();
+  return syncManager.getInstance().getQueueStatus();
 }
 
 export function forceSyncNow(): Promise<SyncResult[]> {
-  return syncManager.forceSyncAll();
+  return syncManager.getInstance().forceSyncAll();
 }

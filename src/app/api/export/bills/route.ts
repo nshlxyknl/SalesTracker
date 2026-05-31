@@ -100,7 +100,7 @@ async function generateExcelExport(sales: any[]) {
   
   // Headers
   const headers = [
-    "Bill Number", "Date", "Time", "User", "Item Name", 
+    "Bill Number", "Bill Title", "Date", "Time", "User", "Item Name", 
     "Quantity", "Unit Price", "Total Amount", "Payment Method"
   ];
   
@@ -120,6 +120,7 @@ async function generateExcelExport(sales: any[]) {
     const saleDate = new Date(sale.createdAt);
     detailSheet.addRow([
       sale.billNumber || "N/A",
+      sale.billTitle || "Untitled Bill",
       saleDate.toLocaleDateString(),
       saleDate.toLocaleTimeString(),
       sale.user.username,
@@ -132,8 +133,8 @@ async function generateExcelExport(sales: any[]) {
   });
 
   // Format currency columns
-  const unitPriceCol = detailSheet.getColumn(7);
-  const totalAmountCol = detailSheet.getColumn(8);
+  const unitPriceCol = detailSheet.getColumn(8);
+  const totalAmountCol = detailSheet.getColumn(9);
   unitPriceCol.numFmt = '"$"#,##0.00';
   totalAmountCol.numFmt = '"$"#,##0.00';
 
@@ -152,6 +153,7 @@ async function generateExcelExport(sales: any[]) {
     if (!billsMap.has(billKey)) {
       billsMap.set(billKey, {
         billNumber: sale.billNumber,
+        billTitle: sale.billTitle,
         user: sale.user.username,
         date: sale.createdAt,
         paymentMethod: sale.paymentMethod,
@@ -171,7 +173,7 @@ async function generateExcelExport(sales: any[]) {
 
   // Bills summary headers
   const billHeaders = [
-    "Bill Number", "Date", "User", "Items Count", 
+    "Bill Number", "Bill Title", "Date", "User", "Items Count", 
     "Total Amount", "Payment Method"
   ];
   billsSheet.addRow(billHeaders);
@@ -189,6 +191,7 @@ async function generateExcelExport(sales: any[]) {
   Array.from(billsMap.values()).forEach(bill => {
     billsSheet.addRow([
       bill.billNumber || "N/A",
+      bill.billTitle || "Untitled Bill",
       new Date(bill.date).toLocaleDateString(),
       bill.user,
       bill.items.length,
@@ -198,7 +201,7 @@ async function generateExcelExport(sales: any[]) {
   });
 
   // Format bills currency column
-  const billTotalCol = billsSheet.getColumn(5);
+  const billTotalCol = billsSheet.getColumn(6);
   billTotalCol.numFmt = '"$"#,##0.00';
 
   // Auto-fit bills columns
@@ -221,7 +224,7 @@ async function generateExcelExport(sales: any[]) {
 
 async function generateCSVExport(sales: any[]) {
   const headers = [
-    "Bill Number", "Date", "Time", "User", "Item Name", 
+    "Bill Number", "Bill Title", "Date", "Time", "User", "Item Name", 
     "Quantity", "Unit Price", "Total Amount", "Payment Method"
   ];
   
@@ -231,6 +234,7 @@ async function generateCSVExport(sales: any[]) {
     const saleDate = new Date(sale.createdAt);
     const row = [
       `"${sale.billNumber || "N/A"}"`,
+      `"${sale.billTitle || "Untitled Bill"}"`,
       `"${saleDate.toLocaleDateString()}"`,
       `"${saleDate.toLocaleTimeString()}"`,
       `"${sale.user.username}"`,

@@ -94,7 +94,7 @@ export function SyncProvider({
       setQueueStatus(status);
       
       // Get pending conflicts
-      const conflicts = await syncManager.getPendingConflicts();
+      const conflicts = await syncManager.getInstance().getPendingConflicts();
       setPendingConflicts(conflicts);
     } catch (error) {
       console.error('[SyncProvider] Failed to refresh status:', error);
@@ -164,7 +164,7 @@ export function SyncProvider({
     setIsSyncing(true);
     
     try {
-      await syncManager.retryFailedOperations();
+      await syncManager.getInstance().retryFailedOperations();
       await refreshStatus();
     } catch (error) {
       console.error('[SyncProvider] Retry failed operations failed:', error);
@@ -180,7 +180,7 @@ export function SyncProvider({
   // Resolve a conflict
   const resolveConflict = useCallback(async (conflictId: string, resolution: any) => {
     try {
-      await syncManager.resolveConflict(conflictId, resolution);
+      await syncManager.getInstance().resolveConflict(conflictId, resolution);
       await refreshStatus();
     } catch (error) {
       console.error('[SyncProvider] Failed to resolve conflict:', error);
