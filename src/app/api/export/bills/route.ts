@@ -7,6 +7,22 @@ import ExcelJS from "exceljs";
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
+type SaleData = {
+  id: string;
+  billNumber: string;
+  billTitle: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: Date;
+  userId: string;
+  user: {
+    username: string;
+  };
+};
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -24,7 +40,13 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: any = {};
+    const where: {
+      userId?: string;
+      createdAt?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    } = {};
     if (userId) where.userId = userId;
     if (startDate || endDate) {
       where.createdAt = {};
@@ -61,7 +83,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function generateExcelExport(sales: any[]) {
+async function generateExcelExport(sales: SaleData[]) {
   const workbook = new ExcelJS.Workbook();
   
   // Summary Sheet
@@ -222,7 +244,7 @@ async function generateExcelExport(sales: any[]) {
   });
 }
 
-async function generateCSVExport(sales: any[]) {
+async function generateCSVExport(sales: SaleData[]) {
   const headers = [
     "Bill Number", "Bill Title", "Date", "Time", "User", "Item Name", 
     "Quantity", "Unit Price", "Total Amount", "Payment Method"

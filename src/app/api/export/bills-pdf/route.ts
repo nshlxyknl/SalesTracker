@@ -8,6 +8,28 @@ import jsPDF from "jspdf";
 export const dynamic = 'force-dynamic';
 import "jspdf-autotable";
 
+type SaleData = {
+  id: string;
+  billNumber: string;
+  billTitle: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: Date;
+  userId: string;
+  user: {
+    username: string;
+  };
+};
+
+type FilterData = {
+  startDate?: string | null;
+  endDate?: string | null;
+  userId?: string | null;
+};
+
 // Extend jsPDF type to include autoTable
 declare module "jspdf" {
   interface jsPDF {
@@ -32,7 +54,13 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: any = {};
+    const where: {
+      userId?: string;
+      createdAt?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    } = {};
     if (userId) where.userId = userId;
     if (startDate || endDate) {
       where.createdAt = {};
@@ -74,7 +102,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function generatePDFReport(sales: any[], reportType: string, filters: any) {
+async function generatePDFReport(sales: SaleData[], reportType: string, filters: FilterData) {
   const doc = new jsPDF();
   
   // Header
@@ -93,7 +121,7 @@ async function generatePDFReport(sales: any[], reportType: string, filters: any)
   // Summary Statistics
   const totalAmount = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
   const uniqueBills = new Set(sales.map(sale => sale.billNumber)).size;
-  const uniqueUsers = new Set(sales.map(sale => sale.userId)).size;
+  const uniqueUsers = new Set(sales.map(sale => sale.user.username)).size;
   
   let yPosition = filters.startDate || filters.endDate ? 70 : 60;
   

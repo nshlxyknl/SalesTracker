@@ -23,7 +23,13 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     const targetUserId = userId || user.id;
 
     // Build where clause
-    const whereClause: any = isAdmin && !userId ? {} : { userId: targetUserId };
+    const whereClause: {
+      userId?: string;
+      createdAt?: {
+        gte: Date;
+        lt: Date;
+      };
+    } = isAdmin && !userId ? {} : { userId: targetUserId };
 
     // Add date filter if provided
     if (date) {

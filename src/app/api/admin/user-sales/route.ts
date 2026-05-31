@@ -40,7 +40,10 @@ export const GET = withPermission('view_all_sales', async (request: NextRequest)
     const endDate = url.searchParams.get('endDate');
 
     // Build date filter
-    const dateFilter: any = {};
+    const dateFilter: {
+      gte?: Date;
+      lte?: Date;
+    } = {};
     if (startDate) {
       dateFilter.gte = new Date(startDate);
     }

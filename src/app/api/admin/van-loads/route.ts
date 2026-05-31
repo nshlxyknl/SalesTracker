@@ -16,7 +16,13 @@ export const GET = withPermission('manage_van_stock', async (request: NextReques
     }
 
     // Build where clause
-    const whereClause: any = {
+    const whereClause: {
+      userId?: string;
+      date: {
+        gte: Date;
+        lt: Date;
+      };
+    } = {
       date: {
         gte: new Date(date + 'T00:00:00.000Z'),
         lt: new Date(date + 'T23:59:59.999Z')
