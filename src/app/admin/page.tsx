@@ -592,7 +592,7 @@ export default function AdminPage() {
                   <h2 className="font-semibold text-sm text-gray-900">
                     {selectedUser ? `${selectedUser}'s Current Stock` : 'Current Stock'}
                   </h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Today's inventory levels</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Today&apos;s inventory levels</p>
                 </div>
                 {selectedUser && (
                   <button 

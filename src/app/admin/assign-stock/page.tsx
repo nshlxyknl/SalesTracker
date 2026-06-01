@@ -113,7 +113,7 @@ export default function AssignStockPage() {
       }));
       setAssignments(initialAssignments);
     }
-  }, [users, assignments.length]);
+  }, [users.length, assignments.length]);
 
   // Update assignments with existing loads
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function AssignStockPage() {
       });
       setAssignments(updatedAssignments);
     }
-  }, [existingLoads]);
+  }, [existingLoads.length, assignments.length]);
 
   if (isPending || !session?.user) {
     return (
@@ -174,7 +174,7 @@ export default function AssignStockPage() {
     ));
   };
 
-  const updateUserItem = (userId: string, itemIndex: number, field: keyof StockItem, value: any) => {
+  const updateUserItem = (userId: string, itemIndex: number, field: keyof StockItem, value: string | number) => {
     setAssignments(prev => prev.map(assignment => 
       assignment.userId === userId 
         ? {

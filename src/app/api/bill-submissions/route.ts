@@ -79,9 +79,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
 
     // Process bill image
-    let imageData: string;
-    let imageName: string;
-    
     if (billFile.size > 10 * 1024 * 1024) { // 10MB limit
       return Response.json({ 
         error: "Bill image too large. Maximum size is 10MB" 
@@ -89,8 +86,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
 
     const bytes = await billFile.arrayBuffer();
-    imageData = `data:${billFile.type};base64,${Buffer.from(bytes).toString("base64")}`;
-    imageName = billFile.name;
+    const imageData = `data:${billFile.type};base64,${Buffer.from(bytes).toString("base64")}`;
+    const imageName = billFile.name;
 
     // Check if bill number already exists for this user
     const existingBill = await prisma.billSubmission.findFirst({

@@ -7,7 +7,7 @@
  * with existing van stock management functionality.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSync } from './sync-provider';
 import { createVanLoadOffline, getVanLoadsOffline } from '../lib/sync-utils';
 import { SyncStatusIndicator } from './sync-status-indicator';
@@ -36,12 +36,7 @@ export function SyncExample() {
   });
   const [loading, setLoading] = useState(false);
 
-  // Load van loads on component mount
-  useEffect(() => {
-    loadVanLoads();
-  }, []);
-
-  const loadVanLoads = async () => {
+  const loadVanLoads = useCallback(async () => {
     try {
       setLoading(true);
       const loads = await getVanLoadsOffline('user123'); // Example user ID
@@ -51,7 +46,12 @@ export function SyncExample() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load van loads on component mount
+  useEffect(() => {
+    loadVanLoads();
+  }, [loadVanLoads]);
 
   const handleCreateVanLoad = async () => {
     if (!newLoad.itemName || newLoad.loaded <= 0) {
@@ -271,9 +271,9 @@ export function SyncExample() {
         </h3>
         <div className="text-sm text-blue-800 space-y-2">
           <p>1. <strong>Online Mode:</strong> Create van loads normally - they sync immediately</p>
-          <p>2. <strong>Offline Mode:</strong> Disconnect internet, create van loads - they're stored locally</p>
+          <p>2. <strong>Offline Mode:</strong> Disconnect internet, create van loads - they&apos;re stored locally</p>
           <p>3. <strong>Reconnect:</strong> Go back online - pending operations sync automatically</p>
-          <p>4. <strong>Manual Sync:</strong> Use "Force Sync Now" to manually trigger sync</p>
+          <p>4. <strong>Manual Sync:</strong> Use &quot;Force Sync Now&quot; to manually trigger sync</p>
           <p>5. <strong>Status Monitoring:</strong> Watch the sync status indicator for real-time updates</p>
         </div>
       </Card>

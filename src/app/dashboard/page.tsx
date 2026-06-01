@@ -2,14 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ITEMS, formatCaseBottleDisplay, getItemByName, convertBottlesToCases } from "@/app/lib/items";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, LogOut, ShieldCheck, Package, AlertCircle, CheckCircle } from "lucide-react";
-import { RoleGuard } from "@/components/auth/RoleGuard";
+import { Package, AlertCircle, CheckCircle } from "lucide-react";
 import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
 
 type Sale = {
@@ -192,8 +189,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const user = session.user;
   
   // Filter sales based on payment method
   const filteredSales = paymentFilter === "all" 
@@ -247,7 +242,7 @@ export default function DashboardPage() {
                 {/* Summary Header */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-blue-800">Today's Stock Summary</span>
+                    <span className="text-sm font-medium text-blue-800">Today&apos;s Stock Summary</span>
                     <span className="text-sm text-blue-600">
                       {stockData.stock.length} item{stockData.stock.length > 1 ? 's' : ''} assigned
                     </span>

@@ -21,6 +21,24 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const [isInstalled, setIsInstalled] = useState(false);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
+  // Function to show update notification
+  const showUpdateNotification = () => {
+    // Create a custom notification for app updates
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Sales Tracker Update Available', {
+        body: 'A new version is available. Refresh to update.',
+        icon: '/icons/icon-192x192.svg',
+        tag: 'app-update'
+      });
+    }
+  };
+
+  // Function to show sync notifications
+  const showSyncNotification = (message: string, type: 'success' | 'error') => {
+    // You can integrate this with your notification system
+    console.log(`[PWA] ${type.toUpperCase()}: ${message}`);
+  };
+
   useEffect(() => {
     // Check if app is already installed
     const checkIfInstalled = () => {
@@ -135,24 +153,6 @@ export function PWAProvider({ children }: PWAProviderProps) {
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
-
-  // Function to show update notification
-  const showUpdateNotification = () => {
-    // Create a custom notification for app updates
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Sales Tracker Update Available', {
-        body: 'A new version is available. Refresh to update.',
-        icon: '/icons/icon-192x192.svg',
-        tag: 'app-update'
-      });
-    }
-  };
-
-  // Function to show sync notifications
-  const showSyncNotification = (message: string, type: 'success' | 'error') => {
-    // You can integrate this with your notification system
-    console.log(`[PWA] ${type.toUpperCase()}: ${message}`);
-  };
 
   // Function to trigger PWA installation with enhanced UX
   const installPWA = async () => {

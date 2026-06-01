@@ -64,6 +64,20 @@ export function SyncProvider({
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingConflicts, setPendingConflicts] = useState<any[]>([]);
 
+  // Refresh sync status
+  const refreshStatus = useCallback(async () => {
+    try {
+      const status = await getSyncStatus();
+      setQueueStatus(status);
+      
+      // Get pending conflicts
+      const conflicts = await syncManager.getInstance().getPendingConflicts();
+      setPendingConflicts(conflicts);
+    } catch (error) {
+      console.error('[SyncProvider] Failed to refresh status:', error);
+    }
+  }, []);
+
   // Update online status
   useEffect(() => {
     const handleOnline = () => {
@@ -85,28 +99,16 @@ export function SyncProvider({
         window.removeEventListener('offline', handleOffline);
       };
     }
-  }, []);
-
-  // Refresh sync status
-  const refreshStatus = useCallback(async () => {
-    try {
-      const status = await getSyncStatus();
-      setQueueStatus(status);
-      
-      // Get pending conflicts
-      const conflicts = await syncManager.getInstance().getPendingConflicts();
-      setPendingConflicts(conflicts);
-    } catch (error) {
-      console.error('[SyncProvider] Failed to refresh status:', error);
-    }
-  }, []);
+  }, [refreshStatus]);
 
   // Initialize and set up periodic status refresh
   useEffect(() => {
     refreshStatus();
     
     // Refresh status every 30 seconds
-    const interval = setInterval(refreshStatus, 30000);
+    const interval = setInterval(() => {
+      refreshStatus();
+    }, 30000);
     
     return () => clearInterval(interval);
   }, [refreshStatus]);

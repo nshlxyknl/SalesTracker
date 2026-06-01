@@ -33,7 +33,18 @@ type FilterData = {
 // Extend jsPDF type to include autoTable
 declare module "jspdf" {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: (options: {
+      head?: string[][];
+      body?: string[][];
+      startY?: number;
+      theme?: string;
+      styles?: Record<string, unknown>;
+      headStyles?: Record<string, unknown>;
+      bodyStyles?: Record<string, unknown>;
+      alternateRowStyles?: Record<string, unknown>;
+      columnStyles?: Record<string | number, Record<string, unknown>>;
+      margin?: { top?: number; right?: number; bottom?: number; left?: number };
+    }) => jsPDF;
   }
 }
 

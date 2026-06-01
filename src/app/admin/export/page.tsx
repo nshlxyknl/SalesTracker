@@ -109,7 +109,7 @@ export default function ExportPage() {
               <span>{error}</span>
             </div>
             <p className="text-sm text-red-600 mt-2">
-              This usually means you need to log in again or there's a server issue.
+              This usually means you need to log in again or there&apos;s a server issue.
             </p>
           </CardContent>
         </Card>

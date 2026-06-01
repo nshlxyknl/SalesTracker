@@ -138,7 +138,7 @@ export const GET = withPermission('view_all_sales', async (request: NextRequest)
     userSalesData.sort((a, b) => b.totalAmount - a.totalAmount);
 
     // Calculate overall statistics
-    const totalRevenue = sales.reduce((sum: number, sale) => sum + sale.totalAmount, 0);
+    const totalRevenue = sales.reduce((sum: number, sale: SaleWithUser) => sum + sale.totalAmount, 0);
     const totalSalesCount = sales.length;
     const totalUsers = userSalesData.length;
     const averagePerUser = totalUsers > 0 ? totalRevenue / totalUsers : 0;

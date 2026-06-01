@@ -53,7 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    loadSession();
+    // Use a callback to avoid direct setState in effect
+    const initializeSession = () => {
+      loadSession();
+    };
+    initializeSession();
   }, []);
 
   // Expose refresh function for manual session updates
