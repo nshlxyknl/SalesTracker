@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withPermission, withUserOrAdmin, requireOwnershipOrAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
+import type { SaleQuantity, VanLoadStock } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -69,7 +70,7 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
 
     // Check stock availability for each item
     const today = new Date().toISOString().split('T')[0];
-    const userStock = await prisma.vanLoad.findMany({
+    const userStock: VanLoadStock[] = await prisma.vanLoad.findMany({
       where: {
         userId: user.id,
         date: {
@@ -80,7 +81,7 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
     });
 
     // Get today's sales to calculate current stock
-    const todaySales = await prisma.sale.findMany({
+    const todaySales: SaleQuantity[] = await prisma.sale.findMany({
       where: {
         userId: user.id,
         createdAt: {
@@ -92,13 +93,13 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
 
     // Calculate current stock levels
     const stockMap = new Map<string, number>();
-    userStock.forEach(load => {
+    userStock.forEach((load) => {
       const key = load.itemName;
       stockMap.set(key, (stockMap.get(key) || 0) + load.loaded - load.returned);
     });
 
     // Subtract already sold quantities
-    todaySales.forEach(sale => {
+    todaySales.forEach((sale) => {
       const key = sale.itemName;
       stockMap.set(key, (stockMap.get(key) || 0) - sale.quantity);
     });

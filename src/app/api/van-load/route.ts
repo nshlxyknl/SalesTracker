@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
+import type { VanLoadWithUser } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export const GET = withAdmin(async (request: NextRequest, user) => {
       where.date = { gte: start, lte: end };
     }
 
-    const loads = await prisma.vanLoad.findMany({
+    const loads: VanLoadWithUser[] = await prisma.vanLoad.findMany({
       where,
       include: { user: { select: { username: true } } },
       orderBy: { createdAt: "desc" },

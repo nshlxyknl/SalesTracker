@@ -3,25 +3,31 @@ import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
 import jsPDF from "jspdf";
+import type { SaleRecord } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 import "jspdf-autotable";
 
-type SaleData = {
-  id: string;
+type SaleData = SaleRecord & {
+  user: { username: string };
+};
+
+type UserSummary = {
+  username: string;
+  totalSales: number;
+  totalAmount: number;
+  billCount: Set<string>;
+};
+
+type BillSummary = {
   billNumber: string;
   billTitle: string;
-  itemName: string;
-  quantity: number;
-  unitPrice: number;
-  totalAmount: number;
+  user: string;
+  date: Date;
   paymentMethod: string;
-  createdAt: Date;
-  userId: string;
-  user: {
-    username: string;
-  };
+  itemCount: number;
+  totalAmount: number;
 };
 
 type FilterData = {
@@ -88,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch sales data
-    const sales = await prisma.sale.findMany({
+    const sales: SaleData[] = await prisma.sale.findMany({
       where,
       include: {
         user: { select: { username: true } }
@@ -130,9 +136,9 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
   }
 
   // Summary Statistics
-  const totalAmount = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-  const uniqueBills = new Set(sales.map(sale => sale.billNumber)).size;
-  const uniqueUsers = new Set(sales.map(sale => sale.user.username)).size;
+  const totalAmount = sales.reduce((sum: number, sale: SaleData) => sum + sale.totalAmount, 0);
+  const uniqueBills = new Set(sales.map((sale: SaleData) => sale.billNumber)).size;
+  const uniqueUsers = new Set(sales.map((sale: SaleData) => sale.user.username)).size;
   
   let yPosition = filters.startDate || filters.endDate ? 70 : 60;
   
@@ -150,8 +156,8 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
 
   if (reportType === "summary") {
     // User-wise summary
-    const userSummary = new Map();
-    sales.forEach(sale => {
+    const userSummary = new Map<string, UserSummary>();
+    sales.forEach((sale: SaleData) => {
       if (!userSummary.has(sale.userId)) {
         userSummary.set(sale.userId, {
           username: sale.user.username,
@@ -160,7 +166,7 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
           billCount: new Set()
         });
       }
-      const summary = userSummary.get(sale.userId);
+      const summary = userSummary.get(sale.userId)!;
       summary.totalSales += sale.quantity;
       summary.totalAmount += sale.totalAmount;
       summary.billCount.add(sale.billNumber);
@@ -183,7 +189,7 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
 
   } else if (reportType === "detailed") {
     // Detailed sales table
-    const tableData = sales.map(sale => [
+    const tableData = sales.map((sale: SaleData) => [
       sale.billNumber || "N/A",
       sale.billTitle || "Untitled Bill",
       new Date(sale.createdAt).toLocaleDateString(),
@@ -216,8 +222,8 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
 
   } else if (reportType === "bills") {
     // Bills summary
-    const billsMap = new Map();
-    sales.forEach(sale => {
+    const billsMap = new Map<string, BillSummary>();
+    sales.forEach((sale: SaleData) => {
       const billKey = `${sale.billNumber}-${sale.userId}`;
       if (!billsMap.has(billKey)) {
         billsMap.set(billKey, {
@@ -230,7 +236,7 @@ async function generatePDFReport(sales: SaleData[], reportType: string, filters:
           totalAmount: 0
         });
       }
-      const bill = billsMap.get(billKey);
+      const bill = billsMap.get(billKey)!;
       bill.itemCount += 1;
       bill.totalAmount += sale.totalAmount;
     });

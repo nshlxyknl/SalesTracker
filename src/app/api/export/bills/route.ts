@@ -3,24 +3,28 @@ import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
 import ExcelJS from "exceljs";
+import type { SaleRecord } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
 
-type SaleData = {
-  id: string;
+type SaleData = SaleRecord & {
+  user: { username: string };
+};
+
+type BillSummary = {
   billNumber: string;
   billTitle: string;
-  itemName: string;
-  quantity: number;
-  unitPrice: number;
-  totalAmount: number;
+  user: string;
+  date: Date;
   paymentMethod: string;
-  createdAt: Date;
-  userId: string;
-  user: {
-    username: string;
-  };
+  items: Array<{
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    totalAmount: number;
+  }>;
+  totalAmount: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -63,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch sales data
-    const sales = await prisma.sale.findMany({
+    const sales: SaleData[] = await prisma.sale.findMany({
       where,
       include: {
         user: { select: { username: true } }
@@ -103,9 +107,9 @@ async function generateExcelExport(sales: SaleData[]) {
   summarySheet.getCell("B4").value = sales.length;
   
   // Calculate summary statistics
-  const totalAmount = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-  const uniqueBills = new Set(sales.map(sale => sale.billNumber)).size;
-  const uniqueUsers = new Set(sales.map(sale => sale.userId)).size;
+  const totalAmount = sales.reduce((sum: number, sale: SaleData) => sum + sale.totalAmount, 0);
+  const uniqueBills = new Set(sales.map((sale: SaleData) => sale.billNumber)).size;
+  const uniqueUsers = new Set(sales.map((sale: SaleData) => sale.userId)).size;
   
   summarySheet.getCell("A5").value = "Total Amount:";
   summarySheet.getCell("B5").value = totalAmount / 100; // Convert from cents
@@ -138,7 +142,7 @@ async function generateExcelExport(sales: SaleData[]) {
   };
 
   // Add data rows
-  sales.forEach(sale => {
+  sales.forEach((sale: SaleData) => {
     const saleDate = new Date(sale.createdAt);
     detailSheet.addRow([
       sale.billNumber || "N/A",
@@ -169,8 +173,8 @@ async function generateExcelExport(sales: SaleData[]) {
   const billsSheet = workbook.addWorksheet("Bills Summary");
   
   // Group sales by bill number
-  const billsMap = new Map();
-  sales.forEach(sale => {
+  const billsMap = new Map<string, BillSummary>();
+  sales.forEach((sale: SaleData) => {
     const billKey = `${sale.billNumber}-${sale.userId}`;
     if (!billsMap.has(billKey)) {
       billsMap.set(billKey, {
@@ -183,7 +187,7 @@ async function generateExcelExport(sales: SaleData[]) {
         totalAmount: 0
       });
     }
-    const bill = billsMap.get(billKey);
+    const bill = billsMap.get(billKey)!;
     bill.items.push({
       itemName: sale.itemName,
       quantity: sale.quantity,
@@ -252,7 +256,7 @@ async function generateCSVExport(sales: SaleData[]) {
   
   let csv = headers.join(",") + "\n";
   
-  sales.forEach(sale => {
+  sales.forEach((sale: SaleData) => {
     const saleDate = new Date(sale.createdAt);
     const row = [
       `"${sale.billNumber || "N/A"}"`,

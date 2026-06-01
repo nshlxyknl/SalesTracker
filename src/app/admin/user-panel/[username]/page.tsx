@@ -199,7 +199,7 @@ export default function UserPanelPage() {
     setStockItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateStockItem = (index: number, field: keyof StockItem, value: any) => {
+  const updateStockItem = (index: number, field: keyof StockItem, value: string | number) => {
     setStockItems(prev => prev.map((item, i) => {
       if (i === index) {
         const updatedItem = { ...item, [field]: value };

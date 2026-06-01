@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withPermission } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
+import type { VanLoadWithUser } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ export const GET = withPermission('manage_van_stock', async (request: NextReques
       whereClause.userId = userId;
     }
 
-    const vanLoads = await prisma.vanLoad.findMany({
+    const vanLoads: VanLoadWithUser[] = await prisma.vanLoad.findMany({
       where: whereClause,
       include: {
         user: {

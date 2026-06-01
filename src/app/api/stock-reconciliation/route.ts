@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { authAPI as auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
+import type { SaleQuantity, VanLoadWithUser } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
     end.setHours(23, 59, 59, 999);
 
     // Get van loads for the day
-    const vanLoads = await prisma.vanLoad.findMany({
+    const vanLoads: VanLoadWithUser[] = await prisma.vanLoad.findMany({
       where: {
         userId,
         date: { gte: start, lte: end }
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get sales for the same day
-    const sales = await prisma.sale.findMany({
+    const sales: SaleQuantity[] = await prisma.sale.findMany({
       where: {
         userId,
         createdAt: { gte: start, lte: end }
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Group sales by item name and sum quantities
-    const salesByItem = sales.reduce((acc, sale) => {
+    const salesByItem = sales.reduce((acc: Record<string, number>, sale: SaleQuantity) => {
       if (!acc[sale.itemName]) {
         acc[sale.itemName] = 0;
       }
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
     }, {} as Record<string, number>);
 
     // Calculate reconciliation for each item
-    const items: StockReconciliationItem[] = vanLoads.map(load => {
+    const items: StockReconciliationItem[] = vanLoads.map((load: VanLoadWithUser) => {
       const expectedSold = load.loaded - load.returned;
       const actualSold = salesByItem[load.itemName] || 0;
       const difference = expectedSold - actualSold;

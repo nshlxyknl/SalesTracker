@@ -261,7 +261,7 @@ export default function StockManagementPage() {
     setStockItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateStockItem = (index: number, field: keyof StockItem, value: any) => {
+  const updateStockItem = (index: number, field: keyof StockItem, value: string | number) => {
     setStockItems(prev => prev.map((item, i) => {
       if (i === index) {
         const updatedItem = { ...item, [field]: value };
@@ -312,7 +312,7 @@ export default function StockManagementPage() {
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
+            onClick={() => setActiveTab(tab.key as "assign" | "overview" | "reconciliation")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? "bg-blue-100 text-blue-700 border border-blue-200"

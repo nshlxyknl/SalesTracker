@@ -1,25 +1,10 @@
 import { NextRequest } from "next/server";
 import { withPermission } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
+import type { SaleWithUser } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
-
-type SaleWithUser = {
-  id: string;
-  billNumber: string;
-  billTitle: string;
-  itemName: string;
-  quantity: number;
-  unitPrice: number;
-  totalAmount: number;
-  paymentMethod: string;
-  createdAt: Date;
-  user: {
-    id: string;
-    username: string;
-  };
-};
 
 type RecentSale = {
   id: string;
@@ -52,7 +37,7 @@ export const GET = withPermission('view_all_sales', async (request: NextRequest)
     }
 
     // Get all sales with user information
-    const sales = await prisma.sale.findMany({
+    const sales: SaleWithUser[] = await prisma.sale.findMany({
       where: {
         ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
       },

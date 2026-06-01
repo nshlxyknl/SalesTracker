@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withUserOrAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
+import type { SaleQuantity, VanLoadStock } from "@/types/stock";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0];
 
     // Get user's van loads for the specified date
-    const vanLoads = await prisma.vanLoad.findMany({
+    const vanLoads: VanLoadStock[] = await prisma.vanLoad.findMany({
       where: {
         userId: user.id,
         date: {
@@ -25,7 +26,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     });
 
     // Get user's sales for the specified date to calculate remaining stock
-    const sales = await prisma.sale.findMany({
+    const sales: SaleQuantity[] = await prisma.sale.findMany({
       where: {
         userId: user.id,
         createdAt: {
@@ -45,7 +46,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     }>();
 
     // Add loaded quantities
-    vanLoads.forEach(load => {
+    vanLoads.forEach((load) => {
       const key = load.itemName;
       if (!stockMap.has(key)) {
         stockMap.set(key, {
@@ -62,7 +63,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     });
 
     // Subtract sold quantities
-    sales.forEach(sale => {
+    sales.forEach((sale) => {
       const key = sale.itemName;
       if (!stockMap.has(key)) {
         stockMap.set(key, {
