@@ -10,6 +10,7 @@ import { SyncStatusIndicator } from "@/components/sync-status-indicator";
 import {
   getPendingSales,
   pendingSalesToDisplayRows,
+  validateSaleItems,
   submitSaleWithOfflineSupport,
 } from "@/lib/offline-sales";
 import { useSync } from "@/components/sync-provider";
@@ -135,6 +136,58 @@ export default function DashboardPage() {
     return { totalQuantity, totalAmount, bottlePrice };
   };
 
+  const getLineError = (line: LineItem) => {
+    const itemName = line.item.name?.trim();
+    if (!itemName) {
+      return "Select an item before recording the sale.";
+    }
+
+    const price = Number(line.casePrice) || 0;
+    if (price <= 0) {
+      return `Set a case price for ${itemName}.`;
+    }
+
+    const quantity = Number(line.totalQuantity) || 0;
+    if (quantity <= 0) {
+      return `Enter a quantity for ${itemName}.`;
+    }
+
+    const stockItem = stockData?.stock.find((stock) => stock.itemName === itemName);
+    if (!stockItem || stockItem.remaining <= 0) {
+      return `${itemName} has no available stock.`;
+    }
+
+    if (quantity > stockItem.remaining) {
+      const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+      return `Only ${formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available for ${itemName}.`;
+    }
+
+    return null;
+  };
+
+  const saleValidationError = (() => {
+    const itemValidationError = validateSaleItems(
+      lines.map((line) => ({
+        itemName: line.item.name,
+        quantity: line.totalQuantity,
+        unitPrice: line.totalQuantity > 0 ? line.totalAmount / line.totalQuantity : 0,
+      }))
+    );
+
+    if (itemValidationError) {
+      return itemValidationError;
+    }
+
+    for (const line of lines) {
+      const lineError = getLineError(line);
+      if (lineError) {
+        return lineError;
+      }
+    }
+
+    return null;
+  })();
+
   function updateLine(id: number, patch: Partial<LineItem>) {
     setLines((prev) => prev.map((line) => {
       if (line.id !== id) return line;
@@ -147,6 +200,11 @@ export default function DashboardPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!session?.user) return;
+
+    if (saleValidationError) {
+      setFormMsg({ type: "error", text: saleValidationError });
+      return;
+    }
 
     setSubmitting(true);
     setFormMsg(null);
@@ -367,9 +425,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {stockItem && totalQuantity > stockItem.remaining && (
+                  {getLineError(line) && (
                     <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                      ⚠️ Only {formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available
+                      ⚠️ {getLineError(line)}
                     </div>
                   )}
                 </div>
@@ -434,7 +492,7 @@ export default function DashboardPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !!saleValidationError}
             className="w-full bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
           >
             {submitting ? "Saving..." : "Record Sale"}

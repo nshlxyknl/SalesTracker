@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { withPermission, withUserOrAdmin, requireOwnershipOrAdmin } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import type { SaleQuantity, VanLoadStock } from "@/types/stock";
+import { validateSaleItems } from "@/lib/offline-sales";
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,11 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
 
     const items: { itemName: string; quantity: number; unitPrice: number }[] = JSON.parse(itemsJson);
     if (!items.length) return Response.json({ error: "No items provided" }, { status: 400 });
+
+    const itemValidationError = validateSaleItems(items);
+    if (itemValidationError) {
+      return Response.json({ error: itemValidationError }, { status: 400 });
+    }
 
     // Check stock availability for each item
     const today = new Date().toISOString().split('T')[0];

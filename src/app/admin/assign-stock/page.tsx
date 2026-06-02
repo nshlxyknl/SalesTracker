@@ -70,16 +70,24 @@ function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
+function getPreviousDateStr(dateStr: string) {
+  const previousDate = new Date(dateStr);
+  previousDate.setDate(previousDate.getDate() - 1);
+  return toDateStr(previousDate);
+}
+
 export default function AssignStockPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
+  const todayStr = toDateStr(new Date());
   
-  const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()));
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [assignments, setAssignments] = useState<StockAssignment[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copyFromDate, setCopyFromDate] = useState("");
+  const [importPreviousDay, setImportPreviousDay] = useState(false);
 
   // Calculate total bottles for an item
   const calculateTotalBottles = (item: StockItem): number => {
@@ -228,14 +236,14 @@ export default function AssignStockPage() {
     ));
   };
 
-  const copyFromPreviousDate = async () => {
-    if (!copyFromDate) {
+  const copyFromPreviousDate = async (dateToCopy: string = copyFromDate) => {
+    if (!dateToCopy) {
       setMessage({ type: "error", text: "Please select a date to copy from" });
       return;
     }
 
     try {
-      const res = await fetch(`/api/admin/van-loads?date=${copyFromDate}`);
+      const res = await fetch(`/api/admin/van-loads?date=${dateToCopy}`);
       if (!res.ok) throw new Error("Failed to fetch previous data");
       
       const previousLoads: VanLoad[] = await res.json();
@@ -279,10 +287,20 @@ export default function AssignStockPage() {
       });
 
       setAssignments(updatedAssignments);
-      setMessage({ type: "success", text: `Copied stock assignments from ${copyFromDate}` });
+      setMessage({ type: "success", text: `Copied stock assignments from ${dateToCopy}` });
     } catch (error) {
       setMessage({ type: "error", text: "Failed to copy from previous date" });
     }
+  };
+
+  const importYesterdayStock = async () => {
+    if (!importPreviousDay) {
+      return;
+    }
+
+    const previousDate = getPreviousDateStr(selectedDate);
+    setCopyFromDate(previousDate);
+    await copyFromPreviousDate(previousDate);
   };
 
   const clearAllAssignments = () => {
@@ -360,6 +378,7 @@ export default function AssignStockPage() {
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="w-40"
+              max={todayStr}
             />
           </div>
         </div>
@@ -430,10 +449,28 @@ export default function AssignStockPage() {
                 onChange={(e) => setCopyFromDate(e.target.value)}
                 className="w-40"
                 placeholder="Select date"
+                max={todayStr}
               />
-              <Button onClick={copyFromPreviousDate} variant="outline">
+              <Button onClick={() => copyFromPreviousDate()} variant="outline">
                 <Copy className="h-4 w-4 mr-2" />
                 Copy from Date
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="importPreviousDay"
+                type="checkbox"
+                checked={importPreviousDay}
+                onChange={(e) => setImportPreviousDay(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="importPreviousDay" className="text-sm font-medium text-gray-700">
+                Import previous day stock
+              </Label>
+              <Button onClick={importYesterdayStock} variant="outline" disabled={!importPreviousDay}>
+                <Copy className="h-4 w-4 mr-2" />
+                Import Yesterday
               </Button>
             </div>
             

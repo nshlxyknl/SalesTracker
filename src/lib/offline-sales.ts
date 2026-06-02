@@ -7,6 +7,28 @@ export type PendingSaleItem = {
   unitPrice: number;
 };
 
+export function validateSaleItems(items: PendingSaleItem[]): string | null {
+  if (!items.length) {
+    return "Add at least one sale item.";
+  }
+
+  for (const item of items) {
+    if (!item.itemName?.trim()) {
+      return "Select an item name before recording the sale.";
+    }
+
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      return `Enter a quantity for ${item.itemName}.`;
+    }
+
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice <= 0) {
+      return `Enter a price for ${item.itemName}.`;
+    }
+  }
+
+  return null;
+}
+
 export type PendingSalePayload = {
   localId: string;
   userId: string;
@@ -122,6 +144,11 @@ export async function submitSaleWithOfflineSupport(params: {
   paymentMethod: string;
   billFile: File | null;
 }): Promise<{ ok: boolean; offline: boolean; error?: string }> {
+  const itemValidationError = validateSaleItems(params.items);
+  if (itemValidationError) {
+    return { ok: false, offline: false, error: itemValidationError };
+  }
+
   if (!isOnline()) {
     await savePendingSale(params);
     return { ok: true, offline: true };
