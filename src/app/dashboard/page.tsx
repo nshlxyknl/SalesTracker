@@ -1,19 +1,18 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@/components/offline-auth-provider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ITEMS, formatCaseBottleDisplay, getItemByName, convertBottlesToCases } from "@/app/lib/items";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CheckCircle, Package } from "lucide-react";
-import { SyncStatusIndicator } from "@/components/sync-status-indicator";
+import { OfflineSyncStatus } from "@/components/offline-sync-status";
 import {
-  getPendingSales,
-  pendingSalesToDisplayRows,
+  offlineSalesService,
   validateSaleItems,
   submitSaleWithOfflineSupport,
-} from "@/lib/offline-sales";
-import { useSync } from "@/components/sync-provider";
+} from "@/lib/offline-sales-service";
+import { useSync } from "@/lib/sync/sync-manager";
 
 type Sale = {
   id: string;
@@ -94,12 +93,6 @@ const newSchemeLine = (): SchemeLineItem => ({
   totalQuantity: 0,
 });
 
-async function fetchSales(date: string): Promise<Sale[]> {
-  const res = await fetch(`/api/sales?date=${encodeURIComponent(date)}`);
-  if (!res.ok) throw new Error("Failed to fetch sales");
-  return res.json();
-}
-
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
@@ -121,13 +114,13 @@ export default function DashboardPage() {
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ["sales", selectedDate],
-    queryFn: () => fetchSales(selectedDate),
+    queryFn: () => offlineSalesService.getSalesForDate(session?.user?.id!, selectedDate),
     enabled: !!session?.user,
   });
 
   const { data: pendingSales = [], refetch: refetchPending } = useQuery({
     queryKey: ["pending-sales", session?.user?.id],
-    queryFn: () => getPendingSales(session?.user?.id),
+    queryFn: () => offlineSalesService.getPendingSales(),
     enabled: !!session?.user?.id,
   });
 
@@ -371,24 +364,12 @@ export default function DashboardPage() {
     );
   }
 
-  const pendingRows = pendingSalesToDisplayRows(pendingSales);
+  const pendingRows = pendingSales;
   const pendingForDate = pendingRows.filter((row) => row.createdAt.split("T")[0] === selectedDate);
 
   const allSales: Sale[] = [
     ...sales,
-    ...pendingForDate.map((row) => ({
-      id: row.id,
-      billNumber: row.billNumber,
-      billTitle: row.billTitle,
-      itemName: row.itemName,
-      quantity: row.quantity,
-      unitPrice: row.unitPrice,
-      totalAmount: row.totalAmount,
-      paymentMethod: row.paymentMethod,
-      billImageBase64: row.billImageBase64,
-      createdAt: row.createdAt,
-      pendingSync: row.pendingSync,
-    })),
+    ...pendingForDate
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const filteredSales = paymentFilter === "all"
@@ -750,7 +731,7 @@ export default function DashboardPage() {
               My Stock
             </h2>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <SyncStatusIndicator compact className="shrink-0" />
+              <OfflineSyncStatus compact className="shrink-0" />
               <input
                 type="date"
                 value={selectedDate}
