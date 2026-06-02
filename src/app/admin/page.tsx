@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, Users, BarChart3, Package, Settings } from "lucide-react";
+import { ChevronDown, ChevronRight, Users, BarChart3, Package, Settings, Menu, X } from "lucide-react";
 import QuickExportDropdown from "@/components/quick-export-dropdown";
 import { formatCaseBottleDisplay, getItemByName } from "@/app/lib/items";
 
@@ -249,6 +249,7 @@ export default function AdminPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stockDate, setStockDate] = useState(() => toDateStr(new Date()));
 
   const { data: sales = [], isLoading } = useQuery({
@@ -263,19 +264,16 @@ export default function AdminPage() {
     enabled: session?.user?.role === "admin",
   });
 
-  useEffect(() => {
-    if (!isPending) {
-      if (!session?.user) { router.push("/login"); return; }
-      if (session.user.role !== "admin") { router.push("/dashboard"); return; }
-    }
-  }, [isPending, session, router]);
-
   if (isPending || !session?.user) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (session.user.role !== "admin") {
+    return null;
   }
 
   const bills = groupIntoBills(sales);
@@ -328,38 +326,59 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 md:flex">
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+        />
+      )}
+
       {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-16' : 'w-80'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}>
+      <div className={`${sidebarCollapsed ? 'md:w-16' : 'md:w-80'} w-80 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 fixed inset-y-0 left-0 z-30 md:static md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between gap-3">
             {!sidebarCollapsed && (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Users</h2>
                 <p className="text-sm text-gray-600">Select a user to view their dashboard</p>
               </div>
             )}
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Users className="w-5 h-5 text-gray-600" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden md:inline-flex p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Users className="w-5 h-5 text-gray-600" />
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Close sidebar"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* All Users Option */}
         <div className="p-2">
           <button
-            onClick={() => setSelectedUser(null)}
+            onClick={() => {
+              setSelectedUser(null);
+              setSidebarOpen(false);
+            }}
             className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
               selectedUser === null 
                 ? 'bg-blue-100 text-blue-700 border border-blue-200' 
                 : 'hover:bg-gray-50 text-gray-700'
             }`}
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-linear-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shrink-0">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
             {!sidebarCollapsed && (
@@ -394,14 +413,17 @@ export default function AdminPage() {
             byUser.map((user) => (
               <div key={user.name} className="space-y-1">
                 <button
-                  onClick={() => handleUserSelect(user.name)}
+                  onClick={() => {
+                    handleUserSelect(user.name);
+                    setSidebarOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
                     selectedUser === user.name 
                       ? 'bg-green-100 text-green-700 border border-green-200' 
                       : 'hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-linear-to-br from-green-600 to-green-700 rounded-full flex items-center justify-center shrink-0">
                     <span className="text-white font-bold text-sm">{user.name.charAt(0).toUpperCase()}</span>
                   </div>
                   {!sidebarCollapsed && (
@@ -418,14 +440,20 @@ export default function AdminPage() {
                 {selectedUser === user.name && !sidebarCollapsed && (
                   <div className="ml-13 space-y-1">
                     <button
-                      onClick={() => handleUserPanelAccess(user.name, 'assign')}
+                        onClick={() => {
+                          handleUserPanelAccess(user.name, 'assign');
+                          setSidebarOpen(false);
+                        }}
                       className="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-2"
                     >
                       <Package className="w-4 h-4" />
                       Assign Stock
                     </button>
                     <button
-                      onClick={() => handleUserPanelAccess(user.name, 'summary')}
+                        onClick={() => {
+                          handleUserPanelAccess(user.name, 'summary');
+                          setSidebarOpen(false);
+                        }}
                       className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-2"
                     >
                       <BarChart3 className="w-4 h-4" />
@@ -442,7 +470,10 @@ export default function AdminPage() {
         {!sidebarCollapsed && (
           <div className="p-4 border-t border-gray-200">
             <button
-              onClick={() => router.push('/admin/analytics')}
+              onClick={() => {
+                router.push('/admin/analytics');
+                setSidebarOpen(false);
+              }}
               className="w-full flex items-center gap-3 p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-left"
             >
               <Settings className="w-5 h-5 text-gray-600" />
@@ -453,16 +484,25 @@ export default function AdminPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6 space-y-6 overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <div>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="p-4 md:p-6 space-y-6 overflow-y-auto">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm"
+                aria-label="Open sidebar"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
               <h1 className="text-xl font-bold text-gray-900">
                 {selectedUser ? `${selectedUser}'s Dashboard` : 'Admin Dashboard'}
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 {selectedUser ? `Viewing data for ${selectedUser}` : 'Overview of all users and sales'}
               </p>
+              </div>
             </div>
             <div className="flex gap-2">
               <button 
@@ -489,7 +529,7 @@ export default function AdminPage() {
                 { label: "Cheque", value: `Rs ${byCheque.toFixed(2)}`, sub: `${filteredSales.filter(s => s.paymentMethod === "cheque").length} items`, color: "from-amber-500 to-amber-600" },
                 { label: "Credit", value: `Rs ${byCredit.toFixed(2)}`, sub: `${filteredSales.filter(s => s.paymentMethod === "credit").length} items`, color: "from-purple-600 to-purple-700" },
               ].map((card) => (
-                <div key={card.label} className={`bg-gradient-to-br ${card.color} rounded-2xl p-5 shadow`}>
+                <div key={card.label} className={`bg-linear-to-br ${card.color} rounded-2xl p-5 shadow`}>
                   <p className="text-white/70 text-xs font-medium">{card.label}</p>
                   <p className="text-2xl font-bold text-white mt-1">{card.value}</p>
                   <p className="text-white/60 text-xs mt-1">{card.sub}</p>
@@ -547,16 +587,16 @@ export default function AdminPage() {
                     return (
                       <div key={bill.billNumber}>
                         <button onClick={() => toggleExpand(bill.billNumber)} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left">
-                          {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                          <span className="font-mono text-sm font-semibold text-gray-900 w-16 flex-shrink-0">#{bill.billNumber}</span>
+                          {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+                          <span className="font-mono text-sm font-semibold text-gray-900 w-16 shrink-0">#{bill.billNumber}</span>
                           <span className="text-sm text-gray-900 font-medium flex-1 truncate">{bill.billTitle}</span>
                           {!selectedUser && <span className="text-sm text-gray-600 flex-1 truncate">{bill.user.username}</span>}
-                          <span className="text-xs text-gray-400 hidden sm:block w-20 flex-shrink-0">{bill.items.length} item{bill.items.length > 1 ? "s" : ""}</span>
-                          <span className="font-semibold text-gray-900 w-28 text-right flex-shrink-0">Rs {bill.billTotal.toFixed(2)}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize flex-shrink-0 ${PAYMENT_COLORS[bill.paymentMethod] ?? ""}`}>{bill.paymentMethod}</span>
-                          <span className="text-xs text-gray-400 w-20 text-right flex-shrink-0">{new Date(bill.createdAt).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400 hidden sm:block w-20 shrink-0">{bill.items.length} item{bill.items.length > 1 ? "s" : ""}</span>
+                          <span className="font-semibold text-gray-900 w-28 text-right shrink-0">Rs {bill.billTotal.toFixed(2)}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0 ${PAYMENT_COLORS[bill.paymentMethod] ?? ""}`}>{bill.paymentMethod}</span>
+                          <span className="text-xs text-gray-400 w-20 text-right shrink-0">{new Date(bill.createdAt).toLocaleDateString()}</span>
                           {bill.billImageBase64 && (
-                            <button onClick={(e) => { e.stopPropagation(); setBillModal(bill.billImageBase64); }} className="text-blue-600 hover:underline text-xs flex-shrink-0">Bill</button>
+                            <button onClick={(e) => { e.stopPropagation(); setBillModal(bill.billImageBase64); }} className="text-blue-600 hover:underline text-xs shrink-0">Bill</button>
                           )}
                         </button>
                         {isOpen && (

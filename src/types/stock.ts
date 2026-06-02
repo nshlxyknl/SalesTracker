@@ -3,6 +3,8 @@ export type VanLoadStock = {
   itemName: string;
   loaded: number;
   returned: number;
+  casePrice: number;
+  schemeBottles: number;
 };
 
 export type VanLoadWithUser = VanLoadStock & {

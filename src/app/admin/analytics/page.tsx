@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +34,20 @@ type Sale = {
   createdAt: string;
   user: { 
     id: string;
+    username: string;
+  };
+};
+
+type VanLoad = {
+  id: string;
+  itemName: string;
+  loaded: number;
+  returned: number;
+  casePrice: number;
+  schemeBottles: number;
+  date: string;
+  userId: string;
+  user: {
     username: string;
   };
 };
@@ -73,6 +87,16 @@ async function fetchUserSalesData(startDate?: string, endDate?: string): Promise
   return res.json();
 }
 
+function toDateStr(date: Date) {
+  return date.toISOString().split("T")[0];
+}
+
+async function fetchVanLoads(date: string): Promise<VanLoad[]> {
+  const res = await fetch(`/api/admin/van-loads?date=${date}`);
+  if (!res.ok) throw new Error("Failed to fetch stock cost data");
+  return res.json();
+}
+
 export default function AnalyticsPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -83,6 +107,7 @@ export default function AnalyticsPage() {
   const [searchUser, setSearchUser] = useState("");
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'amount' | 'sales' | 'bills'>('amount');
+  const [stockDate, setStockDate] = useState(toDateStr(new Date()));
 
   const { data: salesData, isLoading } = useQuery({
     queryKey: ["user-sales-analytics", dateFilter.startDate, dateFilter.endDate],
@@ -90,12 +115,11 @@ export default function AnalyticsPage() {
     enabled: session?.user?.role === "admin",
   });
 
-  useEffect(() => {
-    if (!isPending) {
-      if (!session?.user) { router.push("/login"); return; }
-      if (session.user.role !== "admin") { router.push("/dashboard"); return; }
-    }
-  }, [isPending, session, router]);
+  const { data: stockLoads = [], isLoading: loadingStockLoads } = useQuery({
+    queryKey: ["admin-stock-cost", stockDate],
+    queryFn: () => fetchVanLoads(stockDate),
+    enabled: session?.user?.role === "admin",
+  });
 
   if (isPending || !session?.user) {
     return (
@@ -137,6 +161,41 @@ export default function AnalyticsPage() {
     setDateFilter({ startDate: "", endDate: "" });
     setSearchUser("");
   };
+
+  const stockCostRows = Array.from(
+    stockLoads.reduce((acc, load) => {
+      const key = `${load.userId}:${load.itemName}`;
+      const current = acc.get(key) ?? {
+        userId: load.userId,
+        username: load.user.username,
+        itemName: load.itemName,
+        loaded: 0,
+        returned: 0,
+        schemeBottles: 0,
+        casePrice: 0,
+      };
+
+      current.loaded += load.loaded;
+      current.returned += load.returned;
+      current.schemeBottles += load.schemeBottles || 0;
+      current.casePrice += load.casePrice || 0;
+
+      acc.set(key, current);
+      return acc;
+    }, new Map<string, {
+      userId: string;
+      username: string;
+      itemName: string;
+      loaded: number;
+      returned: number;
+      schemeBottles: number;
+      casePrice: number;
+    }>()),
+  ).map((row) => ({
+    ...row,
+    effectiveBottles: row.loaded,
+    perBottleCost: row.loaded > 0 ? row.casePrice / row.loaded : 0,
+  }));
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -244,6 +303,79 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle>Stock Cost Analysis</CardTitle>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="stockDate" className="text-sm">Date</Label>
+              <Input
+                id="stockDate"
+                type="date"
+                value={stockDate}
+                onChange={(e) => setStockDate(e.target.value)}
+                className="w-40"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingStockLoads ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-4 border rounded-lg space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+              ))}
+            </div>
+          ) : stockCostRows.length === 0 ? (
+            <p className="text-sm text-gray-500">No stock assignments found for {stockDate}.</p>
+          ) : (
+            <div className="space-y-3">
+              {stockCostRows.map((row) => (
+                <div key={`${row.userId}:${row.itemName}`} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900">{row.username} · {row.itemName}</p>
+                      <p className="text-sm text-gray-600">
+                        Case price: Rs {row.casePrice.toFixed(2)} · Scheme: {row.schemeBottles} bottles
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-900">
+                        Rs {row.perBottleCost.toFixed(2)} / bottle
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {row.casePrice > 0 ? `${row.casePrice.toFixed(2)} / ${row.effectiveBottles} bottles` : "No price set"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-white rounded border p-2">
+                      <div className="text-gray-500">Loaded bottles</div>
+                      <div className="font-semibold text-gray-900">{row.loaded}</div>
+                    </div>
+                    <div className="bg-white rounded border p-2">
+                      <div className="text-gray-500">Scheme bottles</div>
+                      <div className="font-semibold text-gray-900">{row.schemeBottles}</div>
+                    </div>
+                    <div className="bg-white rounded border p-2">
+                      <div className="text-gray-500">Returned</div>
+                      <div className="font-semibold text-gray-900">{row.returned}</div>
+                    </div>
+                    <div className="bg-white rounded border p-2">
+                      <div className="text-gray-500">Effective rate</div>
+                      <div className="font-semibold text-gray-900">Rs {row.perBottleCost.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* User Sales Table */}
       <Card>

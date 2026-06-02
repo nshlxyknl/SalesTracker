@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "van_load" ADD COLUMN     "casePrice" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "schemeBottles" INTEGER NOT NULL DEFAULT 0;

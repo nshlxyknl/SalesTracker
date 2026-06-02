@@ -275,24 +275,27 @@ export default function UserPanelPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3 md:gap-4 min-w-0">
           <Button
             variant="outline"
             onClick={() => router.push('/admin')}
+            size="icon"
+            className="shrink-0"
+            aria-label="Back"
+            title="Back"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {loadingUser ? <Skeleton className="h-8 w-48" /> : `${user?.username} Panel`}
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold leading-tight break-words">
+              {loadingUser ? <Skeleton className="h-7 w-44" /> : `${user?.username}'s Panel`}
             </h1>
-            <p className="text-gray-600 mt-1">Manage stock and track sales for this user</p>
+            <p className="text-sm text-gray-600 mt-1">Manage stock and track sales</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div>
             <Label htmlFor="date">Date</Label>
             <Input
@@ -477,7 +480,55 @@ export default function UserPanelPage() {
                 <p className="text-sm text-gray-400">Try selecting a different date or assign stock first</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="space-y-4">
+                <div className="sm:hidden space-y-3">
+                  {stockSummary.map(item => {
+                    const itemConfig = getItemByName(item.itemName);
+                    const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                    const itemLoads = vanLoads.filter(load => load.itemName === item.itemName);
+                    return (
+                      <div key={item.itemName} className="border rounded-lg p-3 bg-white">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="font-medium text-gray-900">{item.itemName}</p>
+                            <p className="text-xs text-gray-500">1 case = {bottlesPerCase} bottles</p>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                            item.remaining > 0
+                              ? "bg-green-100 text-green-700"
+                              : item.remaining === 0
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-red-100 text-red-700"
+                          }`}>
+                            {item.remaining > 0 ? "Good" : item.remaining === 0 ? "Sold Out" : "Over Sold"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-gray-50 rounded p-2">
+                            <div className="text-gray-500">Loaded</div>
+                            <div className="font-medium text-gray-900">{formatCaseBottleDisplay(item.loaded, bottlesPerCase)}</div>
+                          </div>
+                          <div className="bg-gray-50 rounded p-2">
+                            <div className="text-gray-500">Sold</div>
+                            <div className="font-medium text-gray-900">{formatCaseBottleDisplay(item.sold, bottlesPerCase)}</div>
+                          </div>
+                          <div className="bg-gray-50 rounded p-2">
+                            <div className="text-gray-500">To Return</div>
+                            <div className={`font-semibold ${item.remaining >= 0 ? "text-green-700" : "text-red-700"}`}>
+                              {formatCaseBottleDisplay(item.remaining, bottlesPerCase)}
+                            </div>
+                          </div>
+                          <div className="bg-gray-50 rounded p-2">
+                            <div className="text-gray-500">Assignments</div>
+                            <div className="font-medium text-gray-900">{itemLoads.length}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
@@ -554,11 +605,12 @@ export default function UserPanelPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
                 
                 {/* Summary Row */}
                 {stockSummary.length > 0 && (
                   <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="font-medium text-gray-700">Total Assignments:</span>
                         <div className="text-lg font-bold text-purple-600">

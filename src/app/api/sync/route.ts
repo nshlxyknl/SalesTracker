@@ -325,6 +325,8 @@ async function processSyncVanLoad(operation: SyncOperation, userId: string) {
           data: {
             loaded: data.loaded,
             returned: data.returned,
+            casePrice: data.casePrice ?? 0,
+            schemeBottles: data.schemeBottles ?? 0,
             syncStatus: "synced"
           }
         });
@@ -338,6 +340,8 @@ async function processSyncVanLoad(operation: SyncOperation, userId: string) {
             itemName: data.itemName,
             loaded: data.loaded,
             returned: data.returned || 0,
+            casePrice: data.casePrice ?? 0,
+            schemeBottles: data.schemeBottles ?? 0,
             syncStatus: "synced"
           }
         });
@@ -350,6 +354,8 @@ async function processSyncVanLoad(operation: SyncOperation, userId: string) {
         data: {
           loaded: data.loaded,
           returned: data.returned,
+          casePrice: data.casePrice ?? 0,
+          schemeBottles: data.schemeBottles ?? 0,
           syncStatus: "synced"
         }
       });

@@ -34,6 +34,8 @@ type VanLoad = {
   itemName: string;
   loaded: number;
   returned: number;
+  casePrice: number;
+  schemeBottles: number;
   userId: string;
   date: string;
   user: { username: string };
@@ -43,6 +45,8 @@ type StockItem = {
   itemName: string;
   cases: number | "";
   bottles: number | "";
+  casePrice: number | "";
+  schemeBottles: number | "";
   totalBottles: number; // Calculated field for backend storage
 };
 
@@ -50,6 +54,8 @@ const emptyStockItem = (itemName: string = ITEMS[0].name): StockItem => ({
   itemName,
   cases: "",
   bottles: "",
+  casePrice: "",
+  schemeBottles: "",
   totalBottles: 0,
 });
 
@@ -81,7 +87,8 @@ export default function AssignStockPage() {
     if (!itemConfig) return 0;
     const cases = Number(item.cases) || 0;
     const bottles = Number(item.bottles) || 0;
-    return convertCasesToBottles(cases, bottles, itemConfig.caseInfo.bottlesPerCase);
+    const schemeBottles = Number(item.schemeBottles) || 0;
+    return convertCasesToBottles(cases, bottles, itemConfig.caseInfo.bottlesPerCase) + schemeBottles;
   };
 
   useEffect(() => {
@@ -138,6 +145,8 @@ export default function AssignStockPage() {
               itemName: load.itemName,
               cases,
               bottles,
+              casePrice: load.casePrice ?? 0,
+              schemeBottles: load.schemeBottles ?? 0,
               totalBottles: load.loaded
             };
           });
@@ -196,8 +205,8 @@ export default function AssignStockPage() {
             items: assignment.items.map((item, index) => {
               if (index === itemIndex) {
                 const updatedItem = { ...item, [field]: value };
-                // Recalculate totalBottles when cases or bottles change
-                if (field === 'cases' || field === 'bottles') {
+                // Recalculate totalBottles when count or product changes
+                if (field === 'cases' || field === 'bottles' || field === 'schemeBottles' || field === 'itemName') {
                   updatedItem.totalBottles = calculateTotalBottles(updatedItem);
                 }
                 return updatedItem;
@@ -207,7 +216,7 @@ export default function AssignStockPage() {
             totalItems: assignment.items.reduce((sum, item, index) => {
               if (index === itemIndex) {
                 const updatedItem = { ...item, [field]: value };
-                if (field === 'cases' || field === 'bottles') {
+                if (field === 'cases' || field === 'bottles' || field === 'schemeBottles' || field === 'itemName') {
                   updatedItem.totalBottles = calculateTotalBottles(updatedItem);
                 }
                 return sum + updatedItem.totalBottles;
@@ -250,6 +259,8 @@ export default function AssignStockPage() {
           itemName: load.itemName,
           cases,
           bottles,
+          casePrice: load.casePrice ?? 0,
+          schemeBottles: load.schemeBottles ?? 0,
           totalBottles: load.loaded
         });
       });
@@ -303,7 +314,9 @@ export default function AssignStockPage() {
             items: validItems.map(item => ({
               itemName: item.itemName,
               loaded: item.totalBottles,
-              returned: 0
+              returned: 0,
+              casePrice: Number(item.casePrice) || 0,
+              schemeBottles: Number(item.schemeBottles) || 0
             }))
           })
         });
@@ -507,7 +520,7 @@ export default function AssignStockPage() {
                       const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
                       
                       return (
-                        <div key={itemIndex} className="flex items-center gap-4 p-4 bg-white rounded-lg border">
+                        <div key={itemIndex} className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-lg border">
                           <div className="flex-1">
                             <select
                               value={item.itemName}
@@ -534,6 +547,45 @@ export default function AssignStockPage() {
                                     assignment.userId,
                                     itemIndex,
                                     "cases",
+                                    v === "" ? "" : parseInt(v, 10) || 0
+                                  );
+                                }}
+                              />
+                            </div>
+
+                            <div className="w-28">
+                              <label className="block text-xs text-gray-500 mb-1">Case Price</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.casePrice}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateUserItem(
+                                    assignment.userId,
+                                    itemIndex,
+                                    "casePrice",
+                                    v === "" ? "" : parseFloat(v)
+                                  );
+                                }}
+                              />
+                            </div>
+
+                            <div className="w-24">
+                              <label className="block text-xs text-gray-500 mb-1">Scheme</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={item.schemeBottles}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateUserItem(
+                                    assignment.userId,
+                                    itemIndex,
+                                    "schemeBottles",
                                     v === "" ? "" : parseInt(v, 10) || 0
                                   );
                                 }}
@@ -566,6 +618,16 @@ export default function AssignStockPage() {
                           <div className="text-xs text-gray-500 text-center min-w-20">
                             <div>1 case =</div>
                             <div>{bottlesPerCase} bottles</div>
+                          </div>
+
+                          <div className="text-xs text-gray-600 text-center min-w-28">
+                            <div>Loaded bottles</div>
+                            <div className="font-semibold text-gray-900">{item.totalBottles}</div>
+                            <div>
+                              {Number(item.casePrice) > 0 && item.totalBottles > 0
+                                ? `Rs ${(Number(item.casePrice) / item.totalBottles).toFixed(2)} / bottle`
+                                : "Set case price"}
+                            </div>
                           </div>
                           
                           {assignment.items.length > 1 && (
@@ -619,10 +681,13 @@ export default function AssignStockPage() {
                     const itemConfig = getItemByName(item.itemName);
                     const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
                     const displayText = formatCaseBottleDisplay(item.totalBottles, bottlesPerCase);
+                    const rateText = Number(item.casePrice) > 0 && item.totalBottles > 0
+                      ? `Rs ${(Number(item.casePrice) / item.totalBottles).toFixed(2)} / bottle`
+                      : "No case price";
                     
                     return (
                       <div key={index} className="text-xs text-green-700">
-                        {item.itemName}: {displayText}
+                        {item.itemName}: {displayText} · {rateText}
                       </div>
                     );
                   })}

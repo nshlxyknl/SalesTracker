@@ -134,9 +134,9 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
 
   // Full sidebar layout for desktop
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-full z-10">
+      <aside className="w-full md:w-56 bg-white border-b border-gray-200 md:border-r border-gray-200 flex flex-col md:fixed h-auto md:h-full z-10">
         {/* Brand */}
         <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-3">
           <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -224,7 +224,7 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 ml-56 min-h-screen">
+      <main className="flex-1 min-h-screen md:ml-56">
         {children}
       </main>
     </div>

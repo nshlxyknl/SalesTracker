@@ -42,7 +42,7 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
     const { userId, date, items } = body as {
       userId: string;
       date: string;
-      items: { itemName: string; loaded: number; returned: number }[];
+      items: { itemName: string; loaded: number; returned: number; casePrice?: number; schemeBottles?: number }[];
     };
 
     if (!userId || !date || !items?.length) {
@@ -72,6 +72,8 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
           itemName: item.itemName,
           loaded: item.loaded,
           returned: item.returned,
+          casePrice: item.casePrice ?? 0,
+          schemeBottles: item.schemeBottles ?? 0,
         },
       });
       created.push(load);

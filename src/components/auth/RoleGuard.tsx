@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
 import { canAccessRoute, getDefaultRoute, Permission, hasAnyPermission } from '@/lib/rbac';
 
@@ -21,52 +19,7 @@ export function RoleGuard({
   fallbackRoute,
   showLoading = true 
 }: RoleGuardProps) {
-  const router = useRouter();
   const { data: session, isPending } = useSession();
-
-  useEffect(() => {
-    if (isPending) return; // Still loading session
-
-    if (!session?.user) {
-      // Not authenticated, redirect to login
-      router.push('/login');
-      return;
-    }
-
-    // Enhanced role-based access control
-    const user = session.user;
-    
-    // Check if user has required permissions
-    if (requiredPermissions.length > 0 && !hasAnyPermission(user, requiredPermissions)) {
-      // User doesn't have required permissions
-      const redirectRoute = fallbackRoute || getDefaultRoute(user);
-      
-      // Provide more specific redirects based on role
-      if (user.role === 'admin' && !fallbackRoute) {
-        router.push('/admin');
-      } else if (user.role === 'user' && !fallbackRoute) {
-        router.push('/dashboard');
-      } else {
-        router.push(redirectRoute);
-      }
-      return;
-    }
-
-    // Additional role-specific validation
-    const currentPath = window.location.pathname;
-    
-    // Prevent users from accessing admin routes
-    if (currentPath.startsWith('/admin') && user.role !== 'admin') {
-      router.push('/dashboard');
-      return;
-    }
-    
-    // Redirect admins to admin panel if they try to access user dashboard directly
-    if (currentPath === '/dashboard' && user.role === 'admin') {
-      router.push('/admin');
-      return;
-    }
-  }, [session, isPending, router, requiredPermissions, fallbackRoute]);
 
   // Show loading state while checking authentication
   if (isPending) {
@@ -84,12 +37,12 @@ export function RoleGuard({
 
   // Not authenticated
   if (!session?.user) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   // Check permissions
   if (requiredPermissions.length > 0 && !hasAnyPermission(session.user, requiredPermissions)) {
-    return null; // Will redirect in useEffect
+    return null;
   }
 
   return <>{children}</>;
