@@ -34,7 +34,7 @@ export function isStandaloneMode(): boolean {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
   // Check for iOS standalone mode
-  const isIOSStandalone = (window.navigator as any).standalone === true;
+  const isIOSStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   
   // Check for Android TWA (Trusted Web Activity)
   const isTWA = document.referrer.includes('android-app://');
@@ -316,7 +316,7 @@ export class PWAUpdateManager {
  */
 export function trackPWAEvent(
   eventName: string,
-  properties: Record<string, any> = {}
+  properties: Record<string, unknown> = {}
 ): void {
   // Track PWA-specific events
   const pwaProperties = {
@@ -328,7 +328,7 @@ export function trackPWAEvent(
 
   // Send to analytics service (Google Analytics, etc.)
   if ('gtag' in window) {
-    (window as any).gtag('event', eventName, {
+    (window as Window & { gtag: (...args: unknown[]) => void }).gtag('event', eventName, {
       event_category: 'pwa',
       custom_parameters: pwaProperties
     });
@@ -363,7 +363,7 @@ export function getDeviceInfo(): {
   else if (/Mac/i.test(userAgent)) platform = 'macos';
   else if (/Linux/i.test(userAgent)) platform = 'linux';
 
-  const connection = (navigator as any).connection;
+  const connection = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
   const connectionType = connection ? connection.effectiveType : undefined;
 
   return {

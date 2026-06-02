@@ -50,7 +50,10 @@ export function SyncExample() {
 
   // Load van loads on component mount
   useEffect(() => {
-    loadVanLoads();
+    // Use setTimeout to avoid synchronous state update in effect
+    setTimeout(() => {
+      loadVanLoads();
+    }, 0);
   }, [loadVanLoads]);
 
   const handleCreateVanLoad = async () => {

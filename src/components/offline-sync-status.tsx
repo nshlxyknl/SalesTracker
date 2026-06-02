@@ -242,7 +242,7 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
                 <div className="text-xs">
                   <div className="font-medium text-blue-800">Working Offline</div>
                   <div className="text-blue-600 mt-1">
-                    You can continue creating sales. They'll sync when you reconnect.
+                    You can continue creating sales. They&apos;ll sync when you reconnect.
                   </div>
                 </div>
               </div>

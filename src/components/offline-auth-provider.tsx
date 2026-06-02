@@ -48,7 +48,11 @@ export function OfflineAuthProvider({ children }: OfflineAuthProviderProps) {
           // User has valid cookie session, create offline session
           console.log('Found existing cookie session for user:', currentUser.username);
           const cookieSession: AuthSession = {
-            user: currentUser,
+            user: {
+              ...currentUser,
+              createdAt: new Date(currentUser.createdAt),
+              updatedAt: new Date(currentUser.updatedAt)
+            },
             token: 'cookie-based-auth',
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
           };

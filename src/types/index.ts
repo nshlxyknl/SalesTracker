@@ -52,14 +52,14 @@ export type {
 export type { PriceVariant, Item } from '../app/lib/items';
 
 // Common utility types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T = unknown> {
   data: T[];
   total: number;
   page: number;
@@ -140,14 +140,14 @@ export interface AppNotification {
 }
 
 // Form and Validation Types
-export interface FormField<T = any> {
+export interface FormField<T = unknown> {
   value: T;
   error?: string;
   touched: boolean;
   required: boolean;
 }
 
-export interface FormState<T = Record<string, any>> {
+export interface FormState<T = Record<string, unknown>> {
   fields: { [K in keyof T]: FormField<T[K]> };
   isValid: boolean;
   isSubmitting: boolean;

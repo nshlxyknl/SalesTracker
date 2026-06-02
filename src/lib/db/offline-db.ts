@@ -24,6 +24,8 @@ export interface OfflineSession {
     id: string;
     username: string;
     role: string;
+    createdAt: string; // Store as ISO string for IndexedDB compatibility
+    updatedAt: string; // Store as ISO string for IndexedDB compatibility
   };
   token: string;
   expiresAt: string;
@@ -33,7 +35,7 @@ export interface OfflineSession {
 export interface SyncQueue {
   id: string;
   type: 'sale' | 'stock' | 'user';
-  data: any;
+  data: Record<string, unknown>;
   attempts: number;
   createdAt: string;
   lastAttempt?: string;
@@ -175,7 +177,7 @@ export class OfflineStore {
   }
 
   // Stock caching operations
-  static async cacheStock(userId: string, date: string, stockData: any): Promise<void> {
+  static async cacheStock(userId: string, date: string, stockData: Record<string, unknown>): Promise<void> {
     const id = `stock-${userId}-${date}`;
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1); // Cache for 1 hour
@@ -208,7 +210,7 @@ export class OfflineStore {
   }
 
   // Sync queue operations
-  static async addToSyncQueue(type: SyncQueue['type'], data: any): Promise<void> {
+  static async addToSyncQueue(type: SyncQueue['type'], data: Record<string, unknown>): Promise<void> {
     const id = `sync-${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     await db.syncQueue.add({
       id,

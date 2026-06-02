@@ -14,15 +14,15 @@ import { Card } from './ui/card';
 interface SyncConflict {
   id: string;
   type: 'data_conflict' | 'version_mismatch' | 'deleted_modified';
-  localData: any;
-  serverData: any;
+  localData: Record<string, unknown>;
+  serverData: Record<string, unknown>;
   endpoint: string;
   timestamp: Date;
 }
 
 interface ConflictResolution {
   strategy: 'server_wins' | 'client_wins' | 'merge' | 'user_choice';
-  resolvedData: any;
+  resolvedData: Record<string, unknown>;
   requiresUserInput: boolean;
 }
 
@@ -40,7 +40,7 @@ export function SyncConflictDialog({
   isOpen 
 }: SyncConflictDialogProps) {
   const [selectedStrategy, setSelectedStrategy] = useState<'server_wins' | 'client_wins' | 'merge'>('server_wins');
-  const [mergedData, setMergedData] = useState<any>(null);
+  const [mergedData, setMergedData] = useState<Record<string, unknown> | null>(null);
 
   if (!isOpen) return null;
 
@@ -166,7 +166,7 @@ export function SyncConflictDialog({
                     name="strategy"
                     value="server_wins"
                     checked={selectedStrategy === 'server_wins'}
-                    onChange={(e) => setSelectedStrategy(e.target.value as any)}
+                    onChange={(e) => setSelectedStrategy(e.target.value as 'server_wins' | 'client_wins' | 'merge')}
                     className="mt-1"
                   />
                   <div>
@@ -183,7 +183,7 @@ export function SyncConflictDialog({
                     name="strategy"
                     value="client_wins"
                     checked={selectedStrategy === 'client_wins'}
-                    onChange={(e) => setSelectedStrategy(e.target.value as any)}
+                    onChange={(e) => setSelectedStrategy(e.target.value as 'server_wins' | 'client_wins' | 'merge')}
                     className="mt-1"
                   />
                   <div>
@@ -200,7 +200,7 @@ export function SyncConflictDialog({
                     name="strategy"
                     value="merge"
                     checked={selectedStrategy === 'merge'}
-                    onChange={(e) => setSelectedStrategy(e.target.value as any)}
+                    onChange={(e) => setSelectedStrategy(e.target.value as 'server_wins' | 'client_wins' | 'merge')}
                     className="mt-1"
                   />
                   <div>

@@ -136,9 +136,10 @@ export default function AssignStockPage() {
         items: [emptyStockItem()],
         totalItems: 0
       }));
-      setAssignments(initialAssignments);
+      // Use setTimeout to avoid synchronous state update
+      setTimeout(() => setAssignments(initialAssignments), 0);
     }
-  }, [users.length, assignments.length]);
+  }, [users.length, assignments.length, users]);
 
   // Update assignments with existing loads
   useEffect(() => {
@@ -167,9 +168,10 @@ export default function AssignStockPage() {
         }
         return assignment;
       });
-      setAssignments(updatedAssignments);
+      // Use setTimeout to avoid synchronous state update
+      setTimeout(() => setAssignments(updatedAssignments), 0);
     }
-  }, [existingLoads.length, assignments.length]);
+  }, [existingLoads.length, assignments.length, assignments, existingLoads]);
 
   if (isPending || !session?.user) {
     return (

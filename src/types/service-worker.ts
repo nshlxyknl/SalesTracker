@@ -48,7 +48,7 @@ export interface CacheStrategyOptions {
   };
   broadcastUpdate?: {
     channelName?: string;
-    options?: Record<string, any>;
+    options?: Record<string, unknown>;
   };
 }
 
@@ -64,7 +64,7 @@ export interface BackgroundSyncOptions {
 export interface ServiceWorkerSyncEventData {
   type: 'van-load' | 'sale' | 'bill-submission' | 'reconciliation';
   operation: 'create' | 'update' | 'delete';
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
   userId: string;
 }
@@ -76,7 +76,7 @@ export interface PushEventData {
   icon?: string;
   badge?: string;
   tag?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   actions?: PushNotificationAction[];
 }
 
@@ -115,12 +115,12 @@ export interface CacheRoute {
 // Service Worker Events
 export interface ServiceWorkerInstallEvent extends Event {
   type: 'install';
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ServiceWorkerActivateEvent extends Event {
   type: 'activate';
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ServiceWorkerFetchEvent extends Event {
@@ -128,26 +128,26 @@ export interface ServiceWorkerFetchEvent extends Event {
   request: Request;
   clientId: string;
   respondWith(response: Promise<Response> | Response): void;
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ServiceWorkerSyncEvent extends Event {
   type: 'sync';
   tag: string;
   lastChance: boolean;
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ServiceWorkerPushEvent extends Event {
   type: 'push';
   data: ServiceWorkerPushMessageData | null;
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 export interface ServiceWorkerPushMessageData {
   arrayBuffer(): ArrayBuffer;
   blob(): Blob;
-  json(): any;
+  json(): unknown;
   text(): string;
 }
 
@@ -155,18 +155,18 @@ export interface ServiceWorkerNotificationEvent extends Event {
   type: 'notificationclick' | 'notificationclose';
   notification: Notification;
   action?: string;
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 // Message Types for SW Communication
 export interface ServiceWorkerMessage {
   type: 'SKIP_WAITING' | 'CLAIM_CLIENTS' | 'CACHE_UPDATE' | 'SYNC_STATUS' | 'OFFLINE_STATUS';
-  payload?: any;
+  payload?: Record<string, unknown>;
 }
 
 export interface ClientMessage {
   type: 'SW_UPDATE_AVAILABLE' | 'SW_UPDATED' | 'CACHE_UPDATED' | 'SYNC_COMPLETE' | 'OFFLINE_READY';
-  payload?: any;
+  payload?: Record<string, unknown>;
 }
 
 // Workbox-style Types (if using Workbox)

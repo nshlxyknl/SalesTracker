@@ -180,7 +180,7 @@ export async function createBillSubmissionOffline(billData: {
   billNumber: string;
   imageData: string;
   imageName: string;
-  selectedItems: any;
+  selectedItems: Record<string, unknown>;
 }) {
   return performOfflineFirstOperation({
     type: 'CREATE',
@@ -199,7 +199,7 @@ export async function updateBillSubmissionOffline(billData: {
   billNumber: string;
   imageData: string;
   imageName: string;
-  selectedItems: any;
+  selectedItems: Record<string, unknown>;
   processed?: boolean;
 }) {
   return performOfflineFirstOperation({
@@ -252,7 +252,7 @@ export async function getDataWithFallback<T>(
 /**
  * Get van loads with offline support
  */
-export async function getVanLoadsOffline(userId?: string, date?: string): Promise<any[]> {
+export async function getVanLoadsOffline(userId?: string, date?: string): Promise<VanLoad[]> {
   return getDataWithFallback(
     () => offlineStorage.getVanLoads(userId),
     `/api/van-load${userId ? `?userId=${userId}` : ''}${date ? `&date=${date}` : ''}`,
@@ -263,7 +263,7 @@ export async function getVanLoadsOffline(userId?: string, date?: string): Promis
 /**
  * Get sales with offline support
  */
-export async function getSalesOffline(userId?: string): Promise<any[]> {
+export async function getSalesOffline(userId?: string): Promise<Sale[]> {
   return getDataWithFallback(
     () => offlineStorage.getSales(userId),
     `/api/sales${userId ? `?userId=${userId}` : ''}`,
@@ -274,7 +274,7 @@ export async function getSalesOffline(userId?: string): Promise<any[]> {
 /**
  * Get bill submissions with offline support
  */
-export async function getBillSubmissionsOffline(userId?: string): Promise<any[]> {
+export async function getBillSubmissionsOffline(userId?: string): Promise<BillSubmission[]> {
   return getDataWithFallback(
     () => offlineStorage.getBillSubmissions(userId),
     `/api/bill-submissions${userId ? `?userId=${userId}` : ''}`,

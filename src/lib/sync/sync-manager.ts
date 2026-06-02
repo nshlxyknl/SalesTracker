@@ -260,7 +260,7 @@ export class SyncManager {
   /**
    * Sync a single sale to the server
    */
-  private async syncSingleSale(sale: OfflineSale, authHeaders: any): Promise<void> {
+  private async syncSingleSale(sale: OfflineSale, authHeaders: Record<string, string>): Promise<void> {
     // Prepare the sale data for the server
     const saleData = {
       billTitle: sale.billTitle,

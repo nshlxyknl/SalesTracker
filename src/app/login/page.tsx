@@ -172,7 +172,7 @@ export default function LoginPage() {
                     <div>
                       <div className="font-medium">Offline Mode</div>
                       <div className="text-xs mt-1">
-                        You can still sign in if you've logged in before. Data will sync when you reconnect.
+                        You can still sign in if you&apos;ve logged in before. Data will sync when you reconnect.
                       </div>
                     </div>
                   </div>

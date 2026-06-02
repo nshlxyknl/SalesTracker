@@ -255,7 +255,7 @@ export class OfflineSalesService {
   /**
    * Subscribe to sync status changes
    */
-  onSyncStatusChange(callback: (status: any) => void): () => void {
+  onSyncStatusChange(callback: (status: { isOnline: boolean; lastSync?: Date; pendingOperations: number }) => void): () => void {
     return syncManager.addListener(callback);
   }
 
@@ -281,7 +281,7 @@ export class OfflineSalesService {
     });
   }
 
-  private async fetchServerSales(date: string): Promise<any[]> {
+  private async fetchServerSales(date: string): Promise<Sale[]> {
     const authHeaders = await persistentAuth.getAuthHeader();
     
     const response = await fetch(`/api/sales?date=${encodeURIComponent(date)}`, {

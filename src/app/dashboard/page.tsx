@@ -114,8 +114,12 @@ export default function DashboardPage() {
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ["sales", selectedDate],
-    queryFn: () => offlineSalesService.getSalesForDate(session?.user?.id!, selectedDate),
-    enabled: !!session?.user,
+    queryFn: () => {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('User ID not available');
+      return offlineSalesService.getSalesForDate(userId, selectedDate);
+    },
+    enabled: !!session?.user?.id,
   });
 
   const { data: pendingSales = [], refetch: refetchPending } = useQuery({

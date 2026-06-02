@@ -4,6 +4,8 @@ export interface User {
   id: string;
   username: string;
   role: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface AuthSession {
@@ -43,7 +45,11 @@ export class PersistentAuth {
       const storedSession = await OfflineStore.getSession();
       if (storedSession) {
         this.currentSession = {
-          user: storedSession.user,
+          user: {
+            ...storedSession.user,
+            createdAt: new Date(storedSession.user.createdAt),
+            updatedAt: new Date(storedSession.user.updatedAt)
+          },
           token: storedSession.token,
           expiresAt: storedSession.expiresAt
         };
@@ -84,7 +90,11 @@ export class PersistentAuth {
       // Extract token from cookie (since it's HTTP-only, we need to handle this differently)
       // For now, we'll create a session based on the user data
       const session: AuthSession = {
-        user: data.user,
+        user: {
+          ...data.user,
+          createdAt: new Date(data.user.createdAt),
+          updatedAt: new Date(data.user.updatedAt)
+        },
         token: 'cookie-based-auth', // Placeholder since we use HTTP-only cookies
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
       };
@@ -110,7 +120,11 @@ export class PersistentAuth {
     
     try {
       await OfflineStore.saveSession({
-        user: session.user,
+        user: {
+          ...session.user,
+          createdAt: session.user.createdAt.toISOString(),
+          updatedAt: session.user.updatedAt.toISOString()
+        },
         token: session.token,
         expiresAt: session.expiresAt,
         createdAt: new Date().toISOString()
@@ -201,7 +215,11 @@ export class PersistentAuth {
 
       const data = await response.json();
       const newSession: AuthSession = {
-        user: data.user,
+        user: {
+          ...data.user,
+          createdAt: new Date(data.user.createdAt),
+          updatedAt: new Date(data.user.updatedAt)
+        },
         token: 'cookie-based-auth', // Placeholder for HTTP-only cookie
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Reset expiration
       };
@@ -233,7 +251,11 @@ export class PersistentAuth {
       // Update session with latest user data
       const data = await response.json();
       const session: AuthSession = {
-        user: data.user,
+        user: {
+          ...data.user,
+          createdAt: new Date(data.user.createdAt),
+          updatedAt: new Date(data.user.updatedAt)
+        },
         token: 'cookie-based-auth',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       };
@@ -252,7 +274,7 @@ export class PersistentAuth {
    * Get authorization header for API requests
    * Note: Since we use HTTP-only cookies, we don't need to manually set headers
    */
-  async getAuthHeader(): Promise<{}> {
+  async getAuthHeader(): Promise<Record<string, never>> {
     // HTTP-only cookies are automatically included in requests
     // No need to manually set authorization headers
     return {};

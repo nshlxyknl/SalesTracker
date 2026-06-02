@@ -5,11 +5,17 @@ import { useSync } from "@/lib/sync/sync-manager";
 import { OfflineSyncStatus } from "@/components/offline-sync-status";
 import { offlineSalesService } from "@/lib/offline-sales-service";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function DebugPage() {
   const { session, user, isLoading, isAuthenticated } = useOfflineAuth();
   const syncStatus = useSync();
-  const [offlineStats, setOfflineStats] = useState<any>(null);
+  const [offlineStats, setOfflineStats] = useState<{
+    sales: number;
+    vanLoads: number;
+    billSubmissions: number;
+    syncQueue: number;
+  } | null>(null);
 
   useEffect(() => {
     async function loadStats() {
@@ -140,10 +146,10 @@ export default function DebugPage() {
         <div className="bg-white rounded-lg border p-6">
           <h2 className="text-lg font-semibold mb-4">Navigation</h2>
           <div className="space-y-2">
-            <a href="/" className="block text-blue-600 hover:underline">← Back to Home</a>
-            <a href="/login" className="block text-blue-600 hover:underline">Login Page</a>
-            <a href="/dashboard" className="block text-blue-600 hover:underline">Dashboard</a>
-            <a href="/admin" className="block text-blue-600 hover:underline">Admin</a>
+            <Link href="/" className="block text-blue-600 hover:underline">← Back to Home</Link>
+            <Link href="/login" className="block text-blue-600 hover:underline">Login Page</Link>
+            <Link href="/dashboard" className="block text-blue-600 hover:underline">Dashboard</Link>
+            <Link href="/admin" className="block text-blue-600 hover:underline">Admin</Link>
           </div>
         </div>
       </div>

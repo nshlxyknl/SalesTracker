@@ -147,7 +147,7 @@ export interface CreateBillSubmissionData {
   billNumber: string;
   imageData: string;
   imageName: string;
-  selectedItems: any;
+  selectedItems: Record<string, unknown>;
   userId: string;
   processed?: boolean;
   syncStatus?: 'pending' | 'synced' | 'failed';
@@ -156,7 +156,7 @@ export interface CreateBillSubmissionData {
 export interface CreateSyncOperationData {
   type: 'CREATE' | 'UPDATE' | 'DELETE';
   endpoint: string;
-  data: any;
+  data: Record<string, unknown>;
   userId: string;
   status?: 'pending' | 'completed' | 'failed';
   retryCount?: number;
@@ -166,10 +166,10 @@ export interface CreateSyncOperationData {
 export interface CreateReconciliationReportData {
   userId: string;
   date: Date;
-  summary: any;
-  itemDetails: any;
-  paymentData: any;
-  discrepancies: any;
+  summary: Record<string, unknown>;
+  itemDetails: Record<string, unknown>[];
+  paymentData: Record<string, unknown>;
+  discrepancies: Record<string, unknown>[];
   status: 'balanced' | 'discrepancies_found';
 }
 
@@ -199,7 +199,7 @@ export interface UpdateBillSubmissionData {
   billNumber?: string;
   imageData?: string;
   imageName?: string;
-  selectedItems?: any;
+  selectedItems?: Record<string, unknown>;
   processed?: boolean;
   syncStatus?: 'pending' | 'synced' | 'failed';
 }

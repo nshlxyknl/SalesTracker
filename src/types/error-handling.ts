@@ -44,7 +44,7 @@ export interface SyncConflict {
 
 // Van Stock Management Error Handling
 export interface ReconciliationErrorHandler {
-  handleCalculationError(error: Error, data: any): void;
+  handleCalculationError(error: Error, data: Record<string, unknown>): void;
   handleMissingData(missingFields: string[]): void;
   handleInvalidQuantities(invalidItems: string[]): void;
   handlePaymentValidationError(error: PaymentValidationError): void;
@@ -53,7 +53,7 @@ export interface ReconciliationErrorHandler {
 export interface PaymentValidationError extends Error {
   code: 'INVALID_AMOUNT' | 'NEGATIVE_VALUE' | 'CALCULATION_ERROR' | 'MISSING_PAYMENT_METHOD';
   field: string;
-  value: any;
+  value: unknown;
 }
 
 export interface BillProcessingErrorHandler {
@@ -82,7 +82,7 @@ export interface ValidationError {
   field: string;
   message: string;
   code: string;
-  value?: any;
+  value?: unknown;
 }
 
 // Generic Error Types
@@ -91,7 +91,7 @@ export interface AppError extends Error {
   category: 'PWA' | 'SYNC' | 'VAN_STOCK' | 'BILL_PROCESSING' | 'NETWORK' | 'API';
   severity: 'low' | 'medium' | 'high' | 'critical';
   recoverable: boolean;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export interface ErrorContext {
@@ -100,7 +100,7 @@ export interface ErrorContext {
   timestamp: Date;
   userAgent?: string;
   url?: string;
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
 }
 
 export interface ErrorRecoveryStrategy {

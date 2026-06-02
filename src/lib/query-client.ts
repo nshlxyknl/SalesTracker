@@ -9,7 +9,7 @@ export const queryClient = new QueryClient({
       // Keep data in cache for 10 minutes
       gcTime: 10 * 60 * 1000,
       // Retry failed queries 2 times
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: Error) => {
         // Don't retry if we're offline
         if (typeof window !== 'undefined' && !navigator.onLine) return false;
         // Don't retry 4xx errors (client errors)
