@@ -11,10 +11,10 @@ export default function DebugPage() {
   const { session, user, isLoading, isAuthenticated } = useOfflineAuth();
   const syncStatus = useSync();
   const [offlineStats, setOfflineStats] = useState<{
-    sales: number;
-    vanLoads: number;
-    billSubmissions: number;
-    syncQueue: number;
+    isOnline: boolean;
+    isSyncing: boolean;
+    pendingCount: number;
+    lastSyncTime: string | null;
   } | null>(null);
 
   useEffect(() => {

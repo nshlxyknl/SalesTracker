@@ -14,17 +14,7 @@ import { SyncStatusIndicator } from './sync-status-indicator';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
-
-interface VanLoad {
-  id?: string;
-  localId?: string;
-  userId: string;
-  date: string;
-  itemName: string;
-  loaded: number;
-  returned: number;
-  syncStatus?: 'pending' | 'synced' | 'failed';
-}
+import type { VanLoad } from '../types/database';
 
 export function SyncExample() {
   const { queueStatus, isOnline, isSyncing, forceSyncAll } = useSync();
@@ -67,7 +57,7 @@ export function SyncExample() {
       
       const vanLoadData = {
         userId: 'user123', // Example user ID
-        date: new Date().toISOString().split('T')[0], // Today's date
+        date: new Date().toISOString().split('T')[0], // Today's date as string
         itemName: newLoad.itemName,
         loaded: newLoad.loaded,
         returned: newLoad.returned
@@ -79,8 +69,13 @@ export function SyncExample() {
       if (result.success) {
         // Add to local state optimistically
         const optimisticLoad: VanLoad = {
-          localId: result.localId,
-          ...vanLoadData,
+          id: result.localId || `temp-${Date.now()}`,
+          date: new Date(),
+          itemName: vanLoadData.itemName,
+          loaded: vanLoadData.loaded,
+          returned: vanLoadData.returned,
+          userId: vanLoadData.userId,
+          createdAt: new Date(),
           syncStatus: 'pending'
         };
         setVanLoads(prev => [...prev, optimisticLoad]);
@@ -244,7 +239,7 @@ export function SyncExample() {
               </thead>
               <tbody>
                 {vanLoads.map((load, index) => (
-                  <tr key={load.id || load.localId || index} className="border-b">
+                  <tr key={load.id || index} className="border-b">
                     <td className="py-2 font-medium">{load.itemName}</td>
                     <td className="py-2">{load.loaded}</td>
                     <td className="py-2">{load.returned}</td>

@@ -182,14 +182,19 @@ export class OfflineStore {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1); // Cache for 1 hour
     
-    await db.cachedStock.put({
+    // Ensure stockData has the required properties or provide defaults
+    const cachedStock: CachedStock = {
       id,
       userId,
       date,
-      ...stockData,
+      stock: Array.isArray(stockData.stock) ? stockData.stock as any[] : [],
+      hasStock: Boolean(stockData.hasStock),
+      totalItems: typeof stockData.totalItems === 'number' ? stockData.totalItems : 0,
       cachedAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString()
-    });
+    };
+    
+    await db.cachedStock.put(cachedStock);
   }
 
   static async getCachedStock(userId: string, date: string): Promise<CachedStock | undefined> {

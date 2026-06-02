@@ -12,8 +12,8 @@ export const queryClient = new QueryClient({
       retry: (failureCount, error: Error) => {
         // Don't retry if we're offline
         if (typeof window !== 'undefined' && !navigator.onLine) return false;
-        // Don't retry 4xx errors (client errors)
-        if (error?.status >= 400 && error?.status < 500) return false;
+        // Don't retry 4xx errors (client errors) - check if error has status property
+        if ('status' in error && typeof error.status === 'number' && error.status >= 400 && error.status < 500) return false;
         // Retry up to 2 times for other errors
         return failureCount < 2;
       },

@@ -1,7 +1,8 @@
 import { OfflineStore, OfflineSale } from './db/offline-db';
 import { persistentAuth } from './auth/persistent-auth';
-import { syncManager } from './sync/sync-manager';
+import { syncManager, SyncStatus } from './sync/sync-manager';
 import { v4 as uuidv4 } from 'uuid';
+import type { Sale } from '../types/database';
 
 export interface SaleItem {
   itemName: string;
@@ -156,6 +157,8 @@ export class OfflineSalesService {
           
           displaySales.push(...newServerSales.map(sale => ({
             ...sale,
+            billImageBase64: sale.billImageBase64 ?? null,
+            createdAt: sale.createdAt instanceof Date ? sale.createdAt.toISOString() : sale.createdAt,
             pendingSync: false
           })));
         } catch (error) {
@@ -255,7 +258,7 @@ export class OfflineSalesService {
   /**
    * Subscribe to sync status changes
    */
-  onSyncStatusChange(callback: (status: { isOnline: boolean; lastSync?: Date; pendingOperations: number }) => void): () => void {
+  onSyncStatusChange(callback: (status: SyncStatus) => void): () => void {
     return syncManager.addListener(callback);
   }
 

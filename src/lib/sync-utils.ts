@@ -8,6 +8,7 @@
 
 import { offlineStorage, generateLocalId, isOnline } from './offline-storage';
 import { queueSyncOperation } from './sync-manager';
+import type { VanLoad, Sale, BillSubmission } from '../types/database';
 import { SyncOperation } from '../types/pwa';
 
 /**
@@ -253,8 +254,11 @@ export async function getDataWithFallback<T>(
  * Get van loads with offline support
  */
 export async function getVanLoadsOffline(userId?: string, date?: string): Promise<VanLoad[]> {
-  return getDataWithFallback(
-    () => offlineStorage.getVanLoads(userId),
+  return getDataWithFallback<VanLoad>(
+    async () => {
+      const data = await offlineStorage.getVanLoads(userId);
+      return data as unknown as VanLoad[];
+    },
     `/api/van-load${userId ? `?userId=${userId}` : ''}${date ? `&date=${date}` : ''}`,
     `vanLoads_${userId || 'all'}_${date || 'all'}`
   );
@@ -264,8 +268,11 @@ export async function getVanLoadsOffline(userId?: string, date?: string): Promis
  * Get sales with offline support
  */
 export async function getSalesOffline(userId?: string): Promise<Sale[]> {
-  return getDataWithFallback(
-    () => offlineStorage.getSales(userId),
+  return getDataWithFallback<Sale>(
+    async () => {
+      const data = await offlineStorage.getSales(userId);
+      return data as unknown as Sale[];
+    },
     `/api/sales${userId ? `?userId=${userId}` : ''}`,
     `sales_${userId || 'all'}`
   );
@@ -275,8 +282,11 @@ export async function getSalesOffline(userId?: string): Promise<Sale[]> {
  * Get bill submissions with offline support
  */
 export async function getBillSubmissionsOffline(userId?: string): Promise<BillSubmission[]> {
-  return getDataWithFallback(
-    () => offlineStorage.getBillSubmissions(userId),
+  return getDataWithFallback<BillSubmission>(
+    async () => {
+      const data = await offlineStorage.getBillSubmissions(userId);
+      return data as unknown as BillSubmission[];
+    },
     `/api/bill-submissions${userId ? `?userId=${userId}` : ''}`,
     `billSubmissions_${userId || 'all'}`
   );
