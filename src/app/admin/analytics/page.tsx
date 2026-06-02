@@ -163,36 +163,35 @@ export default function AnalyticsPage() {
   };
 
   const stockCostRows = Array.from(
-    stockLoads
-      .reduce((acc, load) => {
-        const key = `${load.userId}:${load.itemName}`;
-        const current = acc.get(key) ?? {
-          userId: load.userId,
-          username: load.user.username,
-          itemName: load.itemName,
-          loaded: 0,
-          returned: 0,
-          schemeBottles: 0,
-          casePrice: 0,
-        };
+    stockLoads.reduce((acc, load) => {
+      const key = `${load.userId}:${load.itemName}`;
+      const current = acc.get(key) ?? {
+        userId: load.userId,
+        username: load.user.username,
+        itemName: load.itemName,
+        loaded: 0,
+        returned: 0,
+        schemeBottles: 0,
+        casePrice: 0,
+      };
 
-        current.loaded += load.loaded;
-        current.returned += load.returned;
-        current.schemeBottles += load.schemeBottles || 0;
-        current.casePrice += load.casePrice || 0;
+      current.loaded += load.loaded;
+      current.returned += load.returned;
+      current.schemeBottles += load.schemeBottles || 0;
+      current.casePrice += load.casePrice || 0;
 
-        acc.set(key, current);
-        return acc;
-      }, new Map<string, {
-        userId: string;
-        username: string;
-        itemName: string;
-        loaded: number;
-        returned: number;
-        schemeBottles: number;
-        casePrice: number;
-      }>()),
-  .values()).map((row) => ({
+      acc.set(key, current);
+      return acc;
+    }, new Map<string, {
+      userId: string;
+      username: string;
+      itemName: string;
+      loaded: number;
+      returned: number;
+      schemeBottles: number;
+      casePrice: number;
+    }>() ).values()
+  ).map((row) => ({
     ...row,
     effectiveBottles: row.loaded,
     perBottleCost: row.loaded > 0 ? row.casePrice / row.loaded : 0,
