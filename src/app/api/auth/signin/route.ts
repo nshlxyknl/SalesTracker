@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { signIn } from '@/lib/auth';
+import { AUTH_TOKEN_MAX_AGE_SECONDS, signIn } from '@/lib/auth';
 
 // Prevent static generation for this API route
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
+      maxAge: AUTH_TOKEN_MAX_AGE_SECONDS
     });
 
     return response;

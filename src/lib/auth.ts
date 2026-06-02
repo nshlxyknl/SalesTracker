@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import prisma from './prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+export const AUTH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24;
 
 export interface User {
   id: string;
@@ -35,7 +36,7 @@ export function generateToken(user: User): string {
       role: user.role 
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '1d' }
   );
 }
 
