@@ -54,6 +54,10 @@ const PAYMENT_COLORS: Record<string, string> = {
   credit: "bg-purple-100 text-purple-700",
 };
 
+function toDateStr(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
 let nextId = 1;
 const newLine = (): LineItem => ({
   id: nextId++,
@@ -66,8 +70,8 @@ const newLine = (): LineItem => ({
   totalAmount: 0,
 });
 
-async function fetchSales(): Promise<Sale[]> {
-  const res = await fetch("/api/sales");
+async function fetchSales(date: string): Promise<Sale[]> {
+  const res = await fetch(`/api/sales?date=${encodeURIComponent(date)}`);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 }
@@ -77,19 +81,20 @@ export default function DashboardPage() {
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
 
-  // Add payment filter state
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
+  const today = toDateStr(new Date());
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ["sales"],
-    queryFn: fetchSales,
+    queryKey: ["sales", selectedDate],
+    queryFn: () => fetchSales(selectedDate),
     enabled: !!session?.user,
   });
 
   const { data: stockData, isLoading: stockLoading } = useQuery<StockResponse>({
-    queryKey: ["user-stock", new Date().toISOString().split('T')[0]],
+    queryKey: ["user-stock", selectedDate],
     queryFn: async () => {
-      const res = await fetch("/api/user-stock");
+      const res = await fetch(`/api/user-stock?date=${encodeURIComponent(selectedDate)}`);
       if (!res.ok) throw new Error("Failed to fetch stock");
       return res.json();
     },
@@ -170,8 +175,12 @@ export default function DashboardPage() {
       setBillFile(null);
       setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
-      queryClient.invalidateQueries({ queryKey: ["sales"] });
-      queryClient.invalidateQueries({ queryKey: ["user-stock"] }); // Refresh stock data
+      queryClient.invalidateQueries({ queryKey: ["sales", selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ["user-stock", selectedDate] });
+      if (selectedDate !== today) {
+        queryClient.invalidateQueries({ queryKey: ["sales", today] });
+        queryClient.invalidateQueries({ queryKey: ["user-stock", today] });
+      }
     } else {
       let msg = "Something went wrong.";
       try {
@@ -203,11 +212,17 @@ export default function DashboardPage() {
         {/* Stock Display */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-2">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5" />
                 My Stock
               </h2>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
               {stockData && (
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                   stockData.hasStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -242,7 +257,9 @@ export default function DashboardPage() {
                 {/* Summary Header */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-blue-800">Today&apos;s Stock Summary</span>
+                    <span className="text-sm font-medium text-blue-800">
+                      Stock Summary ({selectedDate === today ? "Today" : selectedDate})
+                    </span>
                     <span className="text-sm text-blue-600">
                       {stockData.stock.length} item{stockData.stock.length > 1 ? 's' : ''} assigned
                     </span>
@@ -579,9 +596,11 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                  <p className="text-gray-400 text-xs">This Month</p>
+                  <p className="text-gray-400 text-xs">
+                    {selectedDate === today ? "Today's Bills" : `Bills on ${selectedDate}`}
+                  </p>
                   <p className="text-2xl font-bold mt-1 text-emerald-600">
-                    Rs {filteredSales.filter((s) => new Date(s.createdAt).getMonth() === new Date().getMonth()).reduce((a, s) => a + s.totalAmount, 0).toFixed(0)}
+                    {new Set(filteredSales.map((s) => s.billNumber || s.id)).size}
                   </p>
                   {paymentFilter !== "all" && (
                     <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>
@@ -592,17 +611,23 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-gray-900">My Sales</h2>
-                {paymentFilter !== "all" && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Showing {filteredSales.length} {paymentFilter} sale{filteredSales.length !== 1 ? 's' : ''} 
-                    {sales.length > filteredSales.length && ` of ${sales.length} total`}
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedDate === today ? "Today" : selectedDate}
+                  {paymentFilter !== "all" && ` · ${paymentFilter} only`}
+                  {paymentFilter !== "all" && filteredSales.length !== sales.length &&
+                    ` (${filteredSales.length} of ${sales.length})`}
+                </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
                 <select
                   value={paymentFilter}
                   onChange={(e) => setPaymentFilter(e.target.value)}
@@ -613,7 +638,15 @@ export default function DashboardPage() {
                   <option value="cheque">Cheque Only</option>
                   <option value="credit">Credit Only</option>
                 </select>
-                <button onClick={() => queryClient.invalidateQueries({ queryKey: ["sales"] })} className="text-xs text-gray-400 hover:text-gray-700">Refresh</button>
+                <button
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ["sales", selectedDate] });
+                    queryClient.invalidateQueries({ queryKey: ["user-stock", selectedDate] });
+                  }}
+                  className="text-xs text-gray-400 hover:text-gray-700 px-2"
+                >
+                  Refresh
+                </button>
               </div>
             </div>
 
@@ -631,7 +664,9 @@ export default function DashboardPage() {
               </div>
             ) : filteredSales.length === 0 ? (
               <p className="text-gray-400 text-center py-12 text-sm">
-                {paymentFilter === "all" ? "No sales yet." : `No ${paymentFilter} sales found.`}
+                {paymentFilter === "all"
+                  ? `No sales on ${selectedDate}.`
+                  : `No ${paymentFilter} sales on ${selectedDate}.`}
               </p>
             ) : (
               <div className="overflow-x-auto">

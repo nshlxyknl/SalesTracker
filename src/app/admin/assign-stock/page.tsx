@@ -41,10 +41,17 @@ type VanLoad = {
 
 type StockItem = {
   itemName: string;
-  cases: number;
-  bottles: number;
+  cases: number | "";
+  bottles: number | "";
   totalBottles: number; // Calculated field for backend storage
 };
+
+const emptyStockItem = (itemName: string = ITEMS[0].name): StockItem => ({
+  itemName,
+  cases: "",
+  bottles: "",
+  totalBottles: 0,
+});
 
 type StockAssignment = {
   userId: string;
@@ -72,7 +79,9 @@ export default function AssignStockPage() {
   const calculateTotalBottles = (item: StockItem): number => {
     const itemConfig = getItemByName(item.itemName);
     if (!itemConfig) return 0;
-    return convertCasesToBottles(item.cases, item.bottles, itemConfig.caseInfo.bottlesPerCase);
+    const cases = Number(item.cases) || 0;
+    const bottles = Number(item.bottles) || 0;
+    return convertCasesToBottles(cases, bottles, itemConfig.caseInfo.bottlesPerCase);
   };
 
   useEffect(() => {
@@ -108,7 +117,7 @@ export default function AssignStockPage() {
       const initialAssignments = users.map(user => ({
         userId: user.id,
         username: user.username,
-        items: [{ itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }],
+        items: [emptyStockItem()],
         totalItems: 0
       }));
       setAssignments(initialAssignments);
@@ -157,7 +166,7 @@ export default function AssignStockPage() {
       assignment.userId === userId 
         ? {
             ...assignment,
-            items: [...assignment.items, { itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }]
+            items: [...assignment.items, emptyStockItem()]
           }
         : assignment
     ));
@@ -174,7 +183,12 @@ export default function AssignStockPage() {
     ));
   };
 
-  const updateUserItem = (userId: string, itemIndex: number, field: keyof StockItem, value: string | number) => {
+  const updateUserItem = (
+    userId: string,
+    itemIndex: number,
+    field: keyof StockItem,
+    value: string | number | ""
+  ) => {
     setAssignments(prev => prev.map(assignment => 
       assignment.userId === userId 
         ? {
@@ -263,7 +277,7 @@ export default function AssignStockPage() {
   const clearAllAssignments = () => {
     const clearedAssignments = assignments.map(assignment => ({
       ...assignment,
-      items: [{ itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }],
+      items: [emptyStockItem()],
       totalItems: 0
     }));
     setAssignments(clearedAssignments);
@@ -514,7 +528,15 @@ export default function AssignStockPage() {
                                 min="0"
                                 placeholder="0"
                                 value={item.cases}
-                                onChange={(e) => updateUserItem(assignment.userId, itemIndex, 'cases', parseInt(e.target.value) || 0)}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateUserItem(
+                                    assignment.userId,
+                                    itemIndex,
+                                    "cases",
+                                    v === "" ? "" : parseInt(v, 10) || 0
+                                  );
+                                }}
                               />
                             </div>
                             
@@ -527,9 +549,14 @@ export default function AssignStockPage() {
                                 placeholder="0"
                                 value={item.bottles}
                                 onChange={(e) => {
-                                  const bottles = parseInt(e.target.value) || 0;
-                                  if (bottles < bottlesPerCase) {
-                                    updateUserItem(assignment.userId, itemIndex, 'bottles', bottles);
+                                  const v = e.target.value;
+                                  if (v === "") {
+                                    updateUserItem(assignment.userId, itemIndex, "bottles", "");
+                                    return;
+                                  }
+                                  const bottles = parseInt(v, 10);
+                                  if (!isNaN(bottles) && bottles < bottlesPerCase) {
+                                    updateUserItem(assignment.userId, itemIndex, "bottles", bottles);
                                   }
                                 }}
                               />

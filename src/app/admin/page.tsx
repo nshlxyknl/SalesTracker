@@ -64,6 +64,10 @@ const PAYMENT_COLORS: Record<string, string> = {
   credit: "bg-purple-100 text-purple-700",
 };
 
+function toDateStr(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
 async function fetchSales(): Promise<Sale[]> {
   const res = await fetch("/api/sales");
   if (!res.ok) throw new Error("Failed to fetch");
@@ -99,9 +103,8 @@ function groupIntoBills(sales: Sale[]): Bill[] {
   return Array.from(map.values());
 }
 
-function UserStockDisplay({ username }: { username: string }) {
+function UserStockDisplay({ username, date }: { username: string; date: string }) {
   const { data: session } = useSession();
-  const today = new Date().toISOString().split('T')[0];
 
   // Fetch user data
   const { data: user } = useQuery<{ id: string; username: string }>({
@@ -116,9 +119,9 @@ function UserStockDisplay({ username }: { username: string }) {
 
   // Fetch van loads for today
   const { data: vanLoads = [], isLoading: loadingLoads } = useQuery<VanLoad[]>({
-    queryKey: ["van-loads-user-stock", user?.id, today],
+    queryKey: ["van-loads-user-stock", user?.id, date],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/van-loads?userId=${user?.id}&date=${today}`);
+      const res = await fetch(`/api/admin/van-loads?userId=${user?.id}&date=${date}`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -127,9 +130,9 @@ function UserStockDisplay({ username }: { username: string }) {
 
   // Fetch sales for today
   const { data: sales = [], isLoading: loadingSales } = useQuery<Sale[]>({
-    queryKey: ["sales-user-stock", user?.id, today],
+    queryKey: ["sales-user-stock", user?.id, date],
     queryFn: async () => {
-      const res = await fetch(`/api/sales?userId=${user?.id}&date=${today}`);
+      const res = await fetch(`/api/sales?userId=${user?.id}&date=${date}`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -200,7 +203,7 @@ function UserStockDisplay({ username }: { username: string }) {
     return (
       <div className="text-center py-6">
         <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-sm text-gray-500 mb-1">No stock assigned for today</p>
+        <p className="text-sm text-gray-500 mb-1">No stock assigned for {date}</p>
         <p className="text-xs text-gray-400">Stock will appear here once assigned</p>
       </div>
     );
@@ -246,6 +249,7 @@ export default function AdminPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [stockDate, setStockDate] = useState(() => toDateStr(new Date()));
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["sales-admin"],
@@ -587,25 +591,33 @@ export default function AdminPage() {
 
             {/* Current Stock Panel */}
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-sm text-gray-900">
-                    {selectedUser ? `${selectedUser}'s Current Stock` : 'Current Stock'}
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Today&apos;s inventory levels</p>
+              <div className="px-5 py-4 border-b border-gray-100 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold text-sm text-gray-900">
+                      {selectedUser ? `${selectedUser}'s Current Stock` : 'Current Stock'}
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">Inventory for selected date</p>
+                  </div>
+                  {selectedUser && (
+                    <button 
+                      onClick={() => handleUserPanelAccess(selectedUser, 'summary')}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium shrink-0"
+                    >
+                      View Details →
+                    </button>
+                  )}
                 </div>
-                {selectedUser && (
-                  <button 
-                    onClick={() => handleUserPanelAccess(selectedUser, 'summary')}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    View Details →
-                  </button>
-                )}
+                <input
+                  type="date"
+                  value={stockDate}
+                  onChange={(e) => setStockDate(e.target.value)}
+                  className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
               </div>
               <div className="p-4">
                 {selectedUser ? (
-                  <UserStockDisplay username={selectedUser} />
+                  <UserStockDisplay username={selectedUser} date={stockDate} />
                 ) : (
                   <div className="text-center py-8">
                     <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />

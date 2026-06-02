@@ -50,10 +50,17 @@ type Sale = {
 
 type StockItem = {
   itemName: string;
-  cases: number;
-  bottles: number;
+  cases: number | "";
+  bottles: number | "";
   totalBottles: number;
 };
+
+const emptyStockItem = (itemName: string = ITEMS[0].name): StockItem => ({
+  itemName,
+  cases: "",
+  bottles: "",
+  totalBottles: 0,
+});
 
 type UserStockSummary = {
   itemName: string;
@@ -79,9 +86,7 @@ export default function UserPanelPage() {
   const [activeTab, setActiveTab] = useState<"assign" | "summary" | "returns">("assign");
   
   // Stock assignment state
-  const [stockItems, setStockItems] = useState<StockItem[]>([
-    { itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }
-  ]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([emptyStockItem()]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -89,7 +94,9 @@ export default function UserPanelPage() {
   const calculateTotalBottles = (item: StockItem): number => {
     const itemConfig = getItemByName(item.itemName);
     if (!itemConfig) return 0;
-    return convertCasesToBottles(item.cases, item.bottles, itemConfig.caseInfo.bottlesPerCase);
+    const cases = Number(item.cases) || 0;
+    const bottles = Number(item.bottles) || 0;
+    return convertCasesToBottles(cases, bottles, itemConfig.caseInfo.bottlesPerCase);
   };
 
   useEffect(() => {
@@ -192,14 +199,14 @@ export default function UserPanelPage() {
   const hasAssignedStock = vanLoads.length > 0;
 
   const addStockItem = () => {
-    setStockItems(prev => [...prev, { itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }]);
+    setStockItems(prev => [...prev, emptyStockItem()]);
   };
 
   const removeStockItem = (index: number) => {
     setStockItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateStockItem = (index: number, field: keyof StockItem, value: string | number) => {
+  const updateStockItem = (index: number, field: keyof StockItem, value: string | number | "") => {
     setStockItems(prev => prev.map((item, i) => {
       if (i === index) {
         const updatedItem = { ...item, [field]: value };
@@ -253,7 +260,7 @@ export default function UserPanelPage() {
           type: "success", 
           text: `Load #${assignmentNumber} added successfully! (${itemCount} item${itemCount > 1 ? 's' : ''})` 
         });
-        setStockItems([{ itemName: ITEMS[0].name, cases: 0, bottles: 0, totalBottles: 0 }]);
+        setStockItems([emptyStockItem()]);
         queryClient.invalidateQueries({ queryKey: ["van-loads-user", user?.id, selectedDate] });
         setActiveTab("summary"); // Switch to summary tab after assignment
       } else {
@@ -375,7 +382,10 @@ export default function UserPanelPage() {
                           min="0"
                           placeholder="0"
                           value={item.cases}
-                          onChange={(e) => updateStockItem(index, 'cases', parseInt(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateStockItem(index, "cases", v === "" ? "" : parseInt(v, 10) || 0);
+                          }}
                         />
                       </div>
                       
@@ -388,9 +398,14 @@ export default function UserPanelPage() {
                           placeholder="0"
                           value={item.bottles}
                           onChange={(e) => {
-                            const bottles = parseInt(e.target.value) || 0;
-                            if (bottles < bottlesPerCase) {
-                              updateStockItem(index, 'bottles', bottles);
+                            const v = e.target.value;
+                            if (v === "") {
+                              updateStockItem(index, "bottles", "");
+                              return;
+                            }
+                            const bottles = parseInt(v, 10);
+                            if (!isNaN(bottles) && bottles < bottlesPerCase) {
+                              updateStockItem(index, "bottles", bottles);
                             }
                           }}
                         />
