@@ -66,7 +66,7 @@ export class PersistentAuth {
     error?: string;
   }> {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,15 +75,18 @@ export class PersistentAuth {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        return { success: false, error };
+        const errorData = await response.json();
+        return { success: false, error: errorData.error || 'Authentication failed' };
       }
 
       const data = await response.json();
+      
+      // Extract token from cookie (since it's HTTP-only, we need to handle this differently)
+      // For now, we'll create a session based on the user data
       const session: AuthSession = {
         user: data.user,
-        token: data.token,
-        expiresAt: data.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours default
+        token: 'cookie-based-auth', // Placeholder since we use HTTP-only cookies
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
       };
 
       // Store session offline
@@ -166,7 +169,7 @@ export class PersistentAuth {
 
     // Try to logout from server (don't fail if offline)
     try {
-      await fetch('/api/auth/logout', {
+      await fetch('/api/auth/signout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,15 +185,11 @@ export class PersistentAuth {
    * Refresh session token (online only)
    */
   async refreshSession(): Promise<AuthSession | null> {
-    const currentSession = await this.getSession();
-    if (!currentSession) return null;
-
     try {
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
+      const response = await fetch('/api/auth/me', {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession.token}`,
         },
       });
 
@@ -203,8 +202,8 @@ export class PersistentAuth {
       const data = await response.json();
       const newSession: AuthSession = {
         user: data.user,
-        token: data.token,
-        expiresAt: data.expiresAt
+        token: 'cookie-based-auth', // Placeholder for HTTP-only cookie
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Reset expiration
       };
 
       await this.saveSession(newSession);
@@ -212,6 +211,7 @@ export class PersistentAuth {
     } catch (error) {
       // Network error, keep current session if still valid
       console.log('Session refresh failed (offline?):', error);
+      const currentSession = await this.getSession();
       return currentSession;
     }
   }
@@ -220,15 +220,9 @@ export class PersistentAuth {
    * Validate session with server when online
    */
   async validateSessionOnline(): Promise<boolean> {
-    const session = await this.getSession();
-    if (!session) return false;
-
     try {
-      const response = await fetch('/api/auth/validate', {
+      const response = await fetch('/api/auth/me', {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.token}`,
-        },
       });
 
       if (!response.ok) {
@@ -236,22 +230,31 @@ export class PersistentAuth {
         return false;
       }
 
+      // Update session with latest user data
+      const data = await response.json();
+      const session: AuthSession = {
+        user: data.user,
+        token: 'cookie-based-auth',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      };
+      await this.saveSession(session);
+      
       return true;
     } catch (error) {
       // Network error, assume session is valid if not expired
       console.log('Session validation failed (offline?):', error);
-      return new Date(session.expiresAt) > new Date();
+      const session = await this.getSession();
+      return session ? new Date(session.expiresAt) > new Date() : false;
     }
   }
 
   /**
    * Get authorization header for API requests
+   * Note: Since we use HTTP-only cookies, we don't need to manually set headers
    */
-  async getAuthHeader(): Promise<{ Authorization: string } | {}> {
-    const session = await this.getSession();
-    if (session?.token) {
-      return { Authorization: `Bearer ${session.token}` };
-    }
+  async getAuthHeader(): Promise<{}> {
+    // HTTP-only cookies are automatically included in requests
+    // No need to manually set authorization headers
     return {};
   }
 }

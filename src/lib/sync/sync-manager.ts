@@ -34,12 +34,20 @@ export class SyncManager {
   }
 
   constructor() {
+    // Only initialize if in browser
+    if (typeof window !== 'undefined') {
+      this.isOnline = navigator.onLine;
+    }
+    
     this.setupEventListeners();
     this.startPeriodicSync();
     this.loadSyncStats();
   }
 
   private setupEventListeners(): void {
+    // Only set up event listeners in the browser
+    if (typeof window === 'undefined') return;
+    
     // Listen for online/offline events
     window.addEventListener('online', () => {
       this.isOnline = true;
@@ -53,14 +61,19 @@ export class SyncManager {
     });
 
     // Listen for page visibility changes to sync when tab becomes active
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && this.isOnline) {
-        this.syncAll();
-      }
-    });
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.isOnline) {
+          this.syncAll();
+        }
+      });
+    }
   }
 
   private startPeriodicSync(): void {
+    // Only start sync interval in browser
+    if (typeof window === 'undefined') return;
+    
     // Sync every 30 seconds when online
     this.syncInterval = setInterval(() => {
       if (this.isOnline && !this.isSyncing) {
@@ -70,6 +83,9 @@ export class SyncManager {
   }
 
   private async loadSyncStats(): Promise<void> {
+    // Only load from localStorage in browser
+    if (typeof window === 'undefined') return;
+    
     try {
       const stats = await OfflineStore.getStats();
       this.totalSynced = stats.totalSales - stats.unsyncedSales;
@@ -149,7 +165,7 @@ export class SyncManager {
    * Sync all pending items
    */
   async syncAll(): Promise<SyncResult> {
-    if (!this.isOnline) {
+    if (typeof window === 'undefined' || !this.isOnline) {
       return {
         success: false,
         synced: 0,
@@ -173,7 +189,7 @@ export class SyncManager {
     try {
       const result = await this.syncSales();
       
-      if (result.synced > 0) {
+      if (result.synced > 0 && typeof window !== 'undefined') {
         this.lastSyncTime = new Date().toISOString();
         this.totalSynced += result.synced;
         localStorage.setItem('lastSyncTime', this.lastSyncTime);
@@ -368,7 +384,9 @@ export class SyncManager {
       await OfflineStore.clearAllData();
       this.lastSyncTime = null;
       this.totalSynced = 0;
-      localStorage.removeItem('lastSyncTime');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('lastSyncTime');
+      }
       this.notifyListeners();
     } catch (error) {
       console.error('Failed to clear sync data:', error);
@@ -384,9 +402,14 @@ export class SyncManager {
       clearInterval(this.syncInterval);
     }
     
-    window.removeEventListener('online', this.syncAll);
-    window.removeEventListener('offline', this.notifyListeners);
-    document.removeEventListener('visibilitychange', this.syncAll);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.syncAll);
+      window.removeEventListener('offline', this.notifyListeners);
+    }
+    
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.syncAll);
+    }
     
     this.listeners.clear();
   }
@@ -397,9 +420,24 @@ export const syncManager = SyncManager.getInstance();
 
 // React hook for using sync manager in components
 export function useSync() {
-  const [status, setStatus] = useState(syncManager.getStatus());
+  const [status, setStatus] = useState(() => {
+    // Only get initial status in browser
+    if (typeof window !== 'undefined') {
+      return syncManager.getStatus();
+    }
+    return {
+      isOnline: false,
+      isSyncing: false,
+      lastSyncTime: null,
+      pendingCount: 0,
+      totalSynced: 0
+    };
+  });
   
   useEffect(() => {
+    // Only set up listener in browser
+    if (typeof window === 'undefined') return;
+    
     const unsubscribe = syncManager.addListener(setStatus);
     return unsubscribe;
   }, []);
@@ -410,6 +448,10 @@ export function useSync() {
     lastSyncTime: status.lastSyncTime,
     pendingCount: status.pendingCount,
     forceSyncAll: () => syncManager.forceSyncAll(),
-    refreshStatus: () => setStatus(syncManager.getStatus()),
+    refreshStatus: () => {
+      if (typeof window !== 'undefined') {
+        setStatus(syncManager.getStatus());
+      }
+    },
   };
 }

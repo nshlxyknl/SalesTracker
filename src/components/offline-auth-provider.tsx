@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { persistentAuth, AuthSession, User } from '@/lib/auth/persistent-auth';
 import { syncManager } from '@/lib/sync/sync-manager';
 import { initializeQueryPersistence, prefetchCriticalData } from '@/lib/query-client';
+import { getCurrentUser } from '@/lib/auth-client';
 
 interface AuthContextType {
   session: AuthSession | null;
@@ -35,14 +36,50 @@ export function OfflineAuthProvider({ children }: OfflineAuthProviderProps) {
         // Initialize query persistence first
         await initializeQueryPersistence();
         
-        // Load stored session
-        const storedSession = await persistentAuth.initialize();
-        setSession(storedSession);
+        // Check for existing cookie-based session first
+        let currentUser: User | null = null;
+        try {
+          currentUser = await getCurrentUser();
+        } catch (error) {
+          console.log('No existing cookie session found');
+        }
         
-        // If we have a session, prefetch critical data
-        if (storedSession) {
-          console.log('Found stored session for user:', storedSession.user.username);
-          await prefetchCriticalData(storedSession.user.id);
+        if (currentUser) {
+          // User has valid cookie session, create offline session
+          console.log('Found existing cookie session for user:', currentUser.username);
+          const cookieSession: AuthSession = {
+            user: currentUser,
+            token: 'cookie-based-auth',
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          };
+          
+          // Save to offline storage and set state
+          await persistentAuth.saveSession(cookieSession);
+          setSession(cookieSession);
+          
+          // Prefetch critical data
+          await prefetchCriticalData(currentUser.id);
+        } else {
+          // No cookie session, check offline storage
+          const storedSession = await persistentAuth.initialize();
+          if (storedSession) {
+            console.log('Found stored session for user:', storedSession.user.username);
+            setSession(storedSession);
+            
+            // Validate with server if online
+            if (navigator.onLine) {
+              try {
+                const isValid = await persistentAuth.validateSessionOnline();
+                if (!isValid) {
+                  console.log('Stored session invalid, clearing');
+                  setSession(null);
+                  await persistentAuth.logout();
+                }
+              } catch (error) {
+                console.log('Session validation failed, but keeping offline session');
+              }
+            }
+          }
         }
         
         setIsInitialized(true);
@@ -56,36 +93,19 @@ export function OfflineAuthProvider({ children }: OfflineAuthProviderProps) {
     initialize();
   }, []);
 
-  // Validate session when online
+  // Validate session when online (disabled to prevent API call loops)
   useEffect(() => {
     if (!isInitialized || !session) return;
 
-    const validateSession = async () => {
-      if (navigator.onLine) {
-        try {
-          const isValid = await persistentAuth.validateSessionOnline();
-          if (!isValid) {
-            console.log('Session invalid, logging out');
-            await handleLogout();
-          }
-        } catch (error) {
-          console.log('Session validation failed (offline?):', error);
-        }
-      }
-    };
-
-    // Validate immediately if online
-    if (navigator.onLine) {
-      validateSession();
-    }
-
-    // Listen for online events to validate session
+    // Listen for online events but don't auto-validate
     const handleOnline = () => {
-      validateSession();
+      console.log('Back online - session will be validated on next user action');
     };
 
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
   }, [session, isInitialized]);
 
   const handleLogin = async (username: string, password: string) => {
@@ -125,6 +145,9 @@ export function OfflineAuthProvider({ children }: OfflineAuthProviderProps) {
       // Clear all cached data on logout
       const { clearQueryCache } = await import('@/lib/query-client');
       await clearQueryCache();
+      
+      // Redirect to login
+      window.location.href = '/login';
       
     } catch (error) {
       console.error('Logout error:', error);

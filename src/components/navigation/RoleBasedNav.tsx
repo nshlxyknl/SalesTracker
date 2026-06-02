@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/components/offline-auth-provider";
+import { useOfflineAuth } from "@/components/offline-auth-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getNavItemsForUser, getDefaultRoute } from "@/lib/rbac";
-import { SyncStatusIndicator } from "@/components/sync-status-indicator";
+import { OfflineSyncStatus } from "@/components/offline-sync-status";
 
 // Icon mapping for dynamic icon rendering
 const ICON_MAP = {
@@ -45,6 +46,7 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { logout } = useOfflineAuth();
 
   if (!session?.user) {
     return <>{children}</>;
@@ -58,8 +60,7 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
 
   const handleSignOut = async () => {
     try {
-      await signOut();
-      router.push('/login');
+      await logout();
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -87,7 +88,7 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
             )}
           </div>
 
-          <SyncStatusIndicator compact />
+          <OfflineSyncStatus compact />
           
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">
@@ -151,7 +152,7 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
         </div>
 
         <div className="px-3 py-2 border-b border-gray-100">
-          <SyncStatusIndicator compact />
+          <OfflineSyncStatus compact />
         </div>
 
         {/* Navigation */}

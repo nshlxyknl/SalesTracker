@@ -20,7 +20,7 @@ interface OfflineSyncStatusProps {
 
 export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSyncStatusProps) {
   const [status, setStatus] = useState<SyncStatusData>({
-    isOnline: navigator.onLine,
+    isOnline: typeof window !== 'undefined' ? navigator.onLine : false,
     isSyncing: false,
     pendingCount: 0,
     lastSyncTime: null,
@@ -29,6 +29,9 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined') return;
+    
     // Subscribe to sync status changes
     const unsubscribe = syncManager.addListener((newStatus) => {
       setStatus(prev => ({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from '@/lib/auth-client';
+import { useSession } from '@/components/offline-auth-provider';
 import { canAccessRoute, getDefaultRoute, Permission, hasAnyPermission } from '@/lib/rbac';
 
 interface RoleGuardProps {
