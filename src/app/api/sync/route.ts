@@ -140,7 +140,7 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
     const { operationId, status, resolution, action } = body as {
       operationId: string;
       status?: string;
-      resolution?: any;
+      resolution?: Record<string, unknown>;
       action?: string;
     };
 
@@ -162,7 +162,7 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
       const updatedOperation = await prisma.syncOperation.update({
         where: { id: operationId },
         data: {
-          data: resolution,
+          data: resolution as import('@prisma/client').Prisma.InputJsonValue,
           status: "pending",
           retryCount: 0,
           error: null
@@ -171,7 +171,7 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
 
       // Try to process the resolved operation
       try {
-        const result = await processSyncOperation(updatedOperation as any, user.id);
+        const result = await processSyncOperation(updatedOperation as unknown as SyncOperation, user.id);
         return Response.json(result);
       } catch (error) {
         return Response.json({
@@ -246,7 +246,7 @@ async function processSyncOperation(operation: SyncOperation, userId: string) {
         id: operation.id,
         type: operation.type,
         endpoint: operation.endpoint,
-        data: operation.data,
+        data: operation.data as import('@prisma/client').Prisma.InputJsonValue,
         userId: userId,
         status: "pending",
         retryCount: operation.retryCount || 0,
@@ -305,7 +305,16 @@ async function processSyncOperation(operation: SyncOperation, userId: string) {
  * Process van load sync operation
  */
 async function processSyncVanLoad(operation: SyncOperation, userId: string) {
-  const data = operation.data;
+  const data = operation.data as { 
+    id?: string;
+    date: string; 
+    itemName: string; 
+    loaded: number;
+    returned: number;
+    casePrice?: number;
+    schemeBottles?: number;
+    [key: string]: unknown;
+  };
   
   switch (operation.type) {
     case 'CREATE':
@@ -376,7 +385,20 @@ async function processSyncVanLoad(operation: SyncOperation, userId: string) {
  * Process sale sync operation
  */
 async function processSyncSale(operation: SyncOperation, userId: string) {
-  const data = operation.data;
+  const data = operation.data as {
+    id?: string;
+    billNumber?: string;
+    billTitle?: string;
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    totalAmount: number;
+    paymentMethod?: string;
+    billImageBase64?: string;
+    billImageName?: string;
+    createdAt?: string;
+    [key: string]: unknown;
+  };
   
   switch (operation.type) {
     case 'CREATE':
@@ -389,9 +411,9 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           totalAmount: data.totalAmount,
-          paymentMethod: data.paymentMethod,
-          billImageBase64: data.billImageBase64,
-          billImageName: data.billImageName,
+          paymentMethod: data.paymentMethod || "cash",
+          billImageBase64: data.billImageBase64 || "",
+          billImageName: data.billImageName || "",
           syncStatus: "synced"
         }
       });
@@ -430,7 +452,16 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
  * Process bill submission sync operation
  */
 async function processSyncBillSubmission(operation: SyncOperation, userId: string) {
-  const data = operation.data;
+  const data = operation.data as {
+    id?: string;
+    billNumber: string;
+    imageData: string;
+    imageName: string;
+    selectedItems: unknown;
+    processed?: boolean;
+    syncStatus?: string;
+    [key: string]: unknown;
+  };
   
   switch (operation.type) {
     case 'CREATE':
@@ -440,7 +471,7 @@ async function processSyncBillSubmission(operation: SyncOperation, userId: strin
           billNumber: data.billNumber,
           imageData: data.imageData,
           imageName: data.imageName,
-          selectedItems: data.selectedItems,
+          selectedItems: data.selectedItems as import('@prisma/client').Prisma.InputJsonValue,
           processed: data.processed || false,
           syncStatus: "synced"
         }
@@ -454,7 +485,7 @@ async function processSyncBillSubmission(operation: SyncOperation, userId: strin
           billNumber: data.billNumber,
           imageData: data.imageData,
           imageName: data.imageName,
-          selectedItems: data.selectedItems,
+          selectedItems: data.selectedItems as import('@prisma/client').Prisma.InputJsonValue,
           processed: data.processed,
           syncStatus: "synced"
         }

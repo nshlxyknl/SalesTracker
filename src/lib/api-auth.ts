@@ -272,7 +272,7 @@ export async function requireOwnershipOrAdmin(
 /**
  * Higher-order function to wrap API handlers with authentication
  */
-export function withAuth<T extends any[]>(
+export function withAuth<T extends unknown[]>(
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
   return async (request: NextRequest, ...args: T): Promise<Response> => {
@@ -289,7 +289,7 @@ export function withAuth<T extends any[]>(
 /**
  * Higher-order function to wrap API handlers with role requirement
  */
-export function withRole<T extends any[]>(
+export function withRole<T extends unknown[]>(
   requiredRole: UserRole,
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
@@ -307,7 +307,7 @@ export function withRole<T extends any[]>(
 /**
  * Higher-order function to wrap API handlers with permission requirement
  */
-export function withPermission<T extends any[]>(
+export function withPermission<T extends unknown[]>(
   requiredPermission: Permission,
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
@@ -325,7 +325,7 @@ export function withPermission<T extends any[]>(
 /**
  * Higher-order function to wrap API handlers with admin role requirement
  */
-export function withAdmin<T extends any[]>(
+export function withAdmin<T extends unknown[]>(
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
   return async (request: NextRequest, ...args: T): Promise<Response> => {
@@ -342,7 +342,7 @@ export function withAdmin<T extends any[]>(
 /**
  * Higher-order function to wrap API handlers with user role requirement
  */
-export function withUser<T extends any[]>(
+export function withUser<T extends unknown[]>(
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
   return async (request: NextRequest, ...args: T): Promise<Response> => {
@@ -359,7 +359,7 @@ export function withUser<T extends any[]>(
 /**
  * Higher-order function to wrap API handlers allowing both user and admin roles
  */
-export function withUserOrAdmin<T extends any[]>(
+export function withUserOrAdmin<T extends unknown[]>(
   handler: (request: NextRequest, user: User, ...args: T) => Promise<Response>
 ) {
   return async (request: NextRequest, ...args: T): Promise<Response> => {

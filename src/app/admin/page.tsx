@@ -608,10 +608,21 @@ export default function AdminPage() {
                               <tbody className="divide-y divide-gray-100">
                                 {bill.items.map((item) => (
                                   <tr key={item.id} className="bg-white">
-                                    <td className="px-8 py-2.5 text-gray-800 font-medium">{item.itemName}</td>
+                                    <td className="px-8 py-2.5 text-gray-800 font-medium">
+                                      {item.itemName}
+                                      {item.unitPrice === 0 && (
+                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                          Scheme
+                                        </span>
+                                      )}
+                                    </td>
                                     <td className="px-8 py-2.5 text-gray-500">{item.quantity}</td>
-                                    <td className="px-8 py-2.5 text-gray-500">Rs {item.unitPrice.toFixed(2)}</td>
-                                    <td className="px-8 py-2.5 font-semibold text-gray-900">Rs {item.totalAmount.toFixed(2)}</td>
+                                    <td className="px-8 py-2.5 text-gray-500">
+                                      {item.unitPrice === 0 ? "—" : `Rs ${item.unitPrice.toFixed(2)}`}
+                                    </td>
+                                    <td className="px-8 py-2.5 font-semibold text-gray-900">
+                                      {item.unitPrice === 0 ? "—" : `Rs ${item.totalAmount.toFixed(2)}`}
+                                    </td>
                                   </tr>
                                 ))}
                                 <tr className="bg-gray-50">

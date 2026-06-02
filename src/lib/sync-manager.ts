@@ -13,15 +13,15 @@ import { SyncOperation, SyncResult, QueueStatus, SyncManager as ISyncManager } f
 export interface SyncConflict {
   id: string;
   type: 'data_conflict' | 'version_mismatch' | 'deleted_modified';
-  localData: any;
-  serverData: any;
+  localData: Record<string, unknown>;
+  serverData: Record<string, unknown>;
   endpoint: string;
   timestamp: Date;
 }
 
 export interface ConflictResolution {
   strategy: 'server_wins' | 'client_wins' | 'merge' | 'user_choice';
-  resolvedData: any;
+  resolvedData: unknown;
   requiresUserInput: boolean;
 }
 
@@ -252,7 +252,10 @@ export class SyncManager implements ISyncManager {
             };
           } else {
             // Auto-resolve conflict and retry
-            const resolvedOperation = { ...operation, data: conflict.resolvedData };
+            const resolvedOperation = { 
+              ...operation, 
+              data: conflict.resolvedData as Record<string, unknown>
+            };
             return await this.processOperation(resolvedOperation);
           }
         }
@@ -356,7 +359,7 @@ export class SyncManager implements ISyncManager {
   /**
    * Handle sync conflicts
    */
-  private async handleConflict(operation: SyncOperation, serverData: any): Promise<ConflictResolution> {
+  private async handleConflict(operation: SyncOperation, serverData: Record<string, unknown>): Promise<ConflictResolution> {
     const conflict: SyncConflict = {
       id: generateLocalId(),
       type: 'data_conflict',
@@ -407,7 +410,7 @@ export class SyncManager implements ISyncManager {
   /**
    * Store conflict for user resolution
    */
-  private async storeConflictForResolution(operation: SyncOperation, serverData: any): Promise<void> {
+  private async storeConflictForResolution(operation: SyncOperation, serverData: Record<string, unknown>): Promise<void> {
     const conflict: SyncConflict = {
       id: generateLocalId(),
       type: 'data_conflict',
@@ -424,7 +427,7 @@ export class SyncManager implements ISyncManager {
   /**
    * Update local data after successful sync
    */
-  private async updateLocalDataAfterSync(operation: SyncOperation, serverData: any): Promise<void> {
+  private async updateLocalDataAfterSync(operation: SyncOperation, serverData: Record<string, unknown>): Promise<void> {
     try {
       // Update sync status in local storage based on operation type
       if (operation.endpoint.includes('/van-load')) {
@@ -443,7 +446,7 @@ export class SyncManager implements ISyncManager {
       }
 
       if (operation.endpoint.includes('/sales') && operation.data?.localId) {
-        await markPendingSaleSynced(operation.data.localId);
+        await markPendingSaleSynced((operation.data as { localId: string }).localId);
         console.log(`[SyncManager] Marked pending sale ${operation.data.localId} as synced`);
       }
 
@@ -594,7 +597,7 @@ export class SyncManager implements ISyncManager {
         id: generateLocalId(),
         type: 'UPDATE', // Assume update for conflict resolution
         endpoint: conflict.endpoint,
-        data: resolution.resolvedData,
+        data: resolution.resolvedData as Record<string, unknown>,
         timestamp: Date.now(),
         retryCount: 0,
         maxRetries: this.config.maxRetries

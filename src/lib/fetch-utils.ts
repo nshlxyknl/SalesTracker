@@ -2,7 +2,7 @@
  * Utility functions for safe API calls and JSON parsing
  */
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -11,7 +11,7 @@ export interface ApiResponse<T = any> {
 /**
  * Safely parse JSON response with proper error handling
  */
-export async function safeJsonResponse<T = any>(response: Response): Promise<ApiResponse<T>> {
+export async function safeJsonResponse<T = unknown>(response: Response): Promise<ApiResponse<T>> {
   try {
     // Check if response is ok
     if (!response.ok) {
@@ -47,7 +47,7 @@ export async function safeJsonResponse<T = any>(response: Response): Promise<Api
 /**
  * Make a safe API call with automatic JSON parsing and error handling
  */
-export async function safeApiCall<T = any>(
+export async function safeApiCall<T = unknown>(
   url: string, 
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
@@ -67,5 +67,5 @@ export async function safeApiCall<T = any>(
  */
 export async function checkAuthStatus(): Promise<boolean> {
   const result = await safeApiCall('/api/auth/me');
-  return result.success && result.data?.user;
+  return result.success && !!(result.data as { user?: unknown })?.user;
 }

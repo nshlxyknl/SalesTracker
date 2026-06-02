@@ -56,7 +56,7 @@ export interface BillSubmission {
   billNumber: string;
   imageData: string;
   imageName: string;
-  selectedItems: any; // JSON data containing SelectedItem[]
+  selectedItems: Record<string, unknown>[]; // JSON data containing SelectedItem[]
   userId: string;
   user?: User;
   processed: boolean;
@@ -69,7 +69,7 @@ export interface SyncOperation {
   id: string;
   type: 'CREATE' | 'UPDATE' | 'DELETE';
   endpoint: string;
-  data: any; // JSON data
+  data: Record<string, unknown>; // JSON data
   userId: string;
   user?: User;
   status: 'pending' | 'completed' | 'failed';
@@ -85,10 +85,10 @@ export interface ReconciliationReport {
   id: string;
   userId: string;
   date: Date;
-  summary: any; // JSON data containing ReconciliationSummary
-  itemDetails: any; // JSON data containing ItemReconciliation[]
-  paymentData: any; // JSON data containing PaymentRecord
-  discrepancies: any; // JSON data containing DiscrepancyAlert[]
+  summary: Record<string, unknown>; // JSON data containing ReconciliationSummary
+  itemDetails: Record<string, unknown>[]; // JSON data containing ItemReconciliation[]
+  paymentData: Record<string, unknown>; // JSON data containing PaymentRecord
+  discrepancies: Record<string, unknown>[]; // JSON data containing DiscrepancyAlert[]
   status: 'balanced' | 'discrepancies_found';
   createdAt: Date;
 }

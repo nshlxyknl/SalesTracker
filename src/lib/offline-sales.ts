@@ -21,8 +21,8 @@ export function validateSaleItems(items: PendingSaleItem[]): string | null {
       return `Enter a quantity for ${item.itemName}.`;
     }
 
-    if (!Number.isFinite(item.unitPrice) || item.unitPrice <= 0) {
-      return `Enter a price for ${item.itemName}.`;
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
+      return `Enter a valid price for ${item.itemName}.`;
     }
   }
 

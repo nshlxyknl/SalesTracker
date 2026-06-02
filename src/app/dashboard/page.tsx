@@ -55,6 +55,14 @@ type LineItem = {
   totalAmount: number;
 };
 
+type SchemeLineItem = {
+  id: number;
+  item: (typeof ITEMS)[0];
+  cases: number | "";
+  bottles: number | "";
+  totalQuantity: number;
+};
+
 const PAYMENT_COLORS: Record<string, string> = {
   cash: "bg-emerald-100 text-emerald-700",
   cheque: "bg-amber-100 text-amber-700",
@@ -77,6 +85,15 @@ const newLine = (): LineItem => ({
   totalAmount: 0,
 });
 
+let nextSchemeId = 1;
+const newSchemeLine = (): SchemeLineItem => ({
+  id: nextSchemeId++,
+  item: ITEMS[0],
+  cases: "",
+  bottles: "",
+  totalQuantity: 0,
+});
+
 async function fetchSales(date: string): Promise<Sale[]> {
   const res = await fetch(`/api/sales?date=${encodeURIComponent(date)}`);
   if (!res.ok) throw new Error("Failed to fetch sales");
@@ -91,6 +108,7 @@ export default function DashboardPage() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
+  const [schemeLines, setSchemeLines] = useState<SchemeLineItem[]>([]);
   const [billTitle, setBillTitle] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "cheque" | "credit">("cash");
   const [billFile, setBillFile] = useState<File | null>(null);
@@ -136,6 +154,16 @@ export default function DashboardPage() {
     return { totalQuantity, totalAmount, bottlePrice };
   };
 
+  const getItemRequestedQuantity = (itemName: string) => {
+    const normalQty = lines
+      .filter((l) => l.item.name === itemName)
+      .reduce((sum, l) => sum + (Number(l.totalQuantity) || 0), 0);
+    const schemeQty = schemeLines
+      .filter((l) => l.item.name === itemName)
+      .reduce((sum, l) => sum + (Number(l.totalQuantity) || 0), 0);
+    return normalQty + schemeQty;
+  };
+
   const getLineError = (line: LineItem) => {
     const itemName = line.item.name?.trim();
     if (!itemName) {
@@ -157,7 +185,33 @@ export default function DashboardPage() {
       return `${itemName} has no available stock.`;
     }
 
-    if (quantity > stockItem.remaining) {
+    const combinedRequested = getItemRequestedQuantity(itemName);
+    if (combinedRequested > stockItem.remaining) {
+      const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+      return `Only ${formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available for ${itemName}.`;
+    }
+
+    return null;
+  };
+
+  const getSchemeLineError = (line: SchemeLineItem) => {
+    const itemName = line.item.name?.trim();
+    if (!itemName) {
+      return "Select an item before recording the scheme.";
+    }
+
+    const quantity = Number(line.totalQuantity) || 0;
+    if (quantity <= 0) {
+      return `Enter a quantity for scheme ${itemName}.`;
+    }
+
+    const stockItem = stockData?.stock.find((stock) => stock.itemName === itemName);
+    if (!stockItem || stockItem.remaining <= 0) {
+      return `${itemName} has no available stock.`;
+    }
+
+    const combinedRequested = getItemRequestedQuantity(itemName);
+    if (combinedRequested > stockItem.remaining) {
       const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
       return `Only ${formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available for ${itemName}.`;
     }
@@ -166,22 +220,47 @@ export default function DashboardPage() {
   };
 
   const saleValidationError = (() => {
-    const itemValidationError = validateSaleItems(
-      lines.map((line) => ({
+    const activeLines = lines.filter(line => (line.totalQuantity || 0) > 0);
+    const activeSchemeLines = schemeLines.filter(line => (line.totalQuantity || 0) > 0);
+
+    if (activeLines.length === 0 && activeSchemeLines.length === 0) {
+      return "Add at least one item or scheme item with quantity greater than 0.";
+    }
+
+    // Combine active items to send validation payload
+    const allActivePendingItems = [
+      ...activeLines.map((line) => ({
         itemName: line.item.name,
         quantity: line.totalQuantity,
         unitPrice: line.totalQuantity > 0 ? line.totalAmount / line.totalQuantity : 0,
-      }))
-    );
+      })),
+      ...activeSchemeLines.map((line) => ({
+        itemName: line.item.name,
+        quantity: line.totalQuantity,
+        unitPrice: 0,
+      })),
+    ];
 
+    const itemValidationError = validateSaleItems(allActivePendingItems);
     if (itemValidationError) {
       return itemValidationError;
     }
 
     for (const line of lines) {
-      const lineError = getLineError(line);
-      if (lineError) {
-        return lineError;
+      if (line.cases !== "" || line.bottles !== "") {
+        const lineError = getLineError(line);
+        if (lineError) {
+          return lineError;
+        }
+      }
+    }
+
+    for (const line of schemeLines) {
+      if (line.cases !== "" || line.bottles !== "") {
+        const lineError = getSchemeLineError(line);
+        if (lineError) {
+          return lineError;
+        }
       }
     }
 
@@ -197,6 +276,23 @@ export default function DashboardPage() {
     }));
   }
 
+  const calculateSchemeLineItem = (line: SchemeLineItem) => {
+    const cases = Number(line.cases) || 0;
+    const bottles = Number(line.bottles) || 0;
+    const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+    const totalQuantity = (cases * bottlesPerCase) + bottles;
+    return { totalQuantity };
+  };
+
+  function updateSchemeLine(id: number, patch: Partial<SchemeLineItem>) {
+    setSchemeLines((prev) => prev.map((line) => {
+      if (line.id !== id) return line;
+      const updatedLine = { ...line, ...patch };
+      const { totalQuantity } = calculateSchemeLineItem(updatedLine);
+      return { ...updatedLine, totalQuantity };
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!session?.user) return;
@@ -209,11 +305,21 @@ export default function DashboardPage() {
     setSubmitting(true);
     setFormMsg(null);
 
-    const items = lines.map((line) => ({
-      itemName: line.item.name,
-      quantity: line.totalQuantity,
-      unitPrice: line.totalQuantity > 0 ? line.totalAmount / line.totalQuantity : 0,
-    }));
+    const activeLines = lines.filter(line => (line.totalQuantity || 0) > 0);
+    const activeSchemeLines = schemeLines.filter(line => (line.totalQuantity || 0) > 0);
+
+    const items = [
+      ...activeLines.map((line) => ({
+        itemName: line.item.name,
+        quantity: line.totalQuantity,
+        unitPrice: line.totalQuantity > 0 ? line.totalAmount / line.totalQuantity : 0,
+      })),
+      ...activeSchemeLines.map((line) => ({
+        itemName: line.item.name,
+        quantity: line.totalQuantity,
+        unitPrice: 0,
+      })),
+    ];
 
     const result = await submitSaleWithOfflineSupport({
       userId: session.user.id,
@@ -237,6 +343,7 @@ export default function DashboardPage() {
         : "Sale recorded.",
     });
     setLines([newLine()]);
+    setSchemeLines([]);
     setBillTitle("");
     setBillFile(null);
     setPreview(null);
@@ -443,6 +550,131 @@ export default function DashboardPage() {
             + Add another item
           </button>
 
+          {/* Scheme Items Section */}
+          <div className="pt-4 border-t border-gray-200 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <Package className="w-4 h-4 text-blue-500" />
+              Scheme Items (Free Stock)
+            </h3>
+            
+            {schemeLines.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No scheme items added to this bill.</p>
+            ) : (
+              <div className="space-y-3">
+                {schemeLines.map((line, index) => {
+                  const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
+                  const stockItem = stockData?.stock.find((stock) => stock.itemName === line.item.name);
+                  const availableBottles = stockItem ? stockItem.remaining : 0;
+                  const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(availableBottles, bottlesPerCase);
+
+                  return (
+                    <div key={line.id} className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-blue-600 font-medium">Scheme Item {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSchemeLines((prev) => prev.filter((existingLine) => existingLine.id !== line.id))}
+                          className="text-gray-300 hover:text-red-500 text-lg leading-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+
+                      <select
+                        value={line.item.name}
+                        onChange={(event) => {
+                          const item = ITEMS.find((existingItem) => existingItem.name === event.target.value)!;
+                          updateSchemeLine(line.id, {
+                            item,
+                            cases: "",
+                            bottles: "",
+                          });
+                        }}
+                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {ITEMS.map((item) => {
+                          const stockItem = stockData?.stock.find((stock) => stock.itemName === item.name);
+                          const hasStock = !!stockItem && stockItem.remaining > 0;
+                          const itemConfig = getItemByName(item.name);
+                          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+                          const availableDisplay = stockItem ? formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase) : "No stock";
+
+                          return (
+                            <option key={item.name} value={item.name} disabled={!hasStock}>
+                              {item.name} {stockItem ? `(${availableDisplay} available)` : "(No stock)"}
+                            </option>
+                          );
+                        })}
+                      </select>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-blue-600 mb-1">Cases</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={availableCases}
+                            value={line.cases}
+                            placeholder="0"
+                            onChange={(event) => {
+                              const cases = event.target.value === "" ? "" : parseInt(event.target.value, 10);
+                              updateSchemeLine(line.id, { cases });
+                            }}
+                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-blue-600 mb-1">Bottles</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={(() => {
+                              const cases = Number(line.cases) || 0;
+                              if (cases >= availableCases) return availableBottlesRemainder;
+                              return bottlesPerCase - 1;
+                            })()}
+                            value={line.bottles}
+                            placeholder="0"
+                            onChange={(event) => {
+                              const bottles = event.target.value === "" ? "" : parseInt(event.target.value, 10);
+                              updateSchemeLine(line.id, { bottles });
+                            }}
+                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs">
+                        <div className="text-gray-400">
+                          <div>1 case = {bottlesPerCase} bottles</div>
+                          <div className="text-blue-600 font-medium font-sans">Price: Not Applicable (Free)</div>
+                        </div>
+                        <div className="text-right font-medium">
+                          <div className="text-blue-800">Qty: {line.totalQuantity} bottles</div>
+                        </div>
+                      </div>
+
+                      {getSchemeLineError(line) && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          ⚠️ {getSchemeLineError(line)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            <button
+              type="button"
+              onClick={() => setSchemeLines((prev) => [...prev, newSchemeLine()])}
+              className="w-full border border-dashed border-blue-200 hover:border-blue-500 text-blue-400 hover:text-blue-600 text-sm py-2 rounded-xl transition-colors bg-blue-50/10 hover:bg-blue-50/20"
+            >
+              + Add scheme item
+            </button>
+          </div>
+
           <div>
             <label className="block text-sm text-gray-600 font-medium mb-2">Payment Method</label>
             <div className="flex gap-3">
@@ -486,7 +718,11 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex justify-between items-center bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-            <span className="text-gray-500 text-sm">{lines.length} item{lines.length > 1 ? "s" : ""} · Total</span>
+            <span className="text-gray-500 text-sm">
+              {lines.filter(l => l.totalQuantity > 0).length} regular item{lines.filter(l => l.totalQuantity > 0).length !== 1 ? "s" : ""}
+              {schemeLines.filter(l => l.totalQuantity > 0).length > 0 && ` · ${schemeLines.filter(l => l.totalQuantity > 0).length} scheme item${schemeLines.filter(l => l.totalQuantity > 0).length !== 1 ? "s" : ""}`}
+              {" "}· Total
+            </span>
             <span className="text-xl font-bold text-gray-900">Rs {grandTotal.toFixed(2)}</span>
           </div>
 
@@ -756,7 +992,14 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                       <div className="bg-gray-50 rounded-lg p-2">
                         <div className="text-gray-400">Item</div>
-                        <div className="font-medium text-gray-900 wrap-break-word">{sale.itemName}</div>
+                        <div className="font-medium text-gray-900 wrap-break-word">
+                          {sale.itemName}
+                          {sale.unitPrice === 0 && (
+                            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">
+                              Scheme
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2">
                         <div className="text-gray-400">Qty</div>
@@ -764,11 +1007,15 @@ export default function DashboardPage() {
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2">
                         <div className="text-gray-400">Unit</div>
-                        <div className="font-medium text-gray-900">Rs {sale.unitPrice.toFixed(2)}</div>
+                        <div className="font-medium text-gray-900">
+                          {sale.unitPrice === 0 ? "Scheme" : `Rs ${sale.unitPrice.toFixed(2)}`}
+                        </div>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2">
                         <div className="text-gray-400">Total</div>
-                        <div className="font-semibold text-gray-900">Rs {sale.totalAmount.toFixed(2)}</div>
+                        <div className="font-semibold text-gray-900">
+                          {sale.unitPrice === 0 ? "—" : `Rs ${sale.totalAmount.toFixed(2)}`}
+                        </div>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2 col-span-2 flex items-center justify-between gap-3">
                         <div>
@@ -807,10 +1054,21 @@ export default function DashboardPage() {
                           {sale.pendingSync && <span className="ml-1 text-amber-600 font-sans">(pending)</span>}
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-900">{sale.billTitle || "Untitled Bill"}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{sale.itemName}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {sale.itemName}
+                          {sale.unitPrice === 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              Scheme
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-gray-500">{sale.quantity}</td>
-                        <td className="px-4 py-3 text-gray-500">Rs {sale.unitPrice.toFixed(2)}</td>
-                        <td className="px-4 py-3 font-semibold text-gray-900">Rs {sale.totalAmount.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {sale.unitPrice === 0 ? "—" : `Rs ${sale.unitPrice.toFixed(2)}`}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">
+                          {sale.unitPrice === 0 ? "—" : `Rs ${sale.totalAmount.toFixed(2)}`}
+                        </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${PAYMENT_COLORS[sale.paymentMethod] ?? ""}`}>
                             {sale.paymentMethod}

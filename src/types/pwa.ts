@@ -37,7 +37,7 @@ export interface ServiceWorkerConfig {
 
 export interface PWASyncEvent {
   tag: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
   retryCount: number;
 }
@@ -63,7 +63,7 @@ export interface SyncOperation {
   id: string;
   type: 'CREATE' | 'UPDATE' | 'DELETE';
   endpoint: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
   retryCount: number;
   maxRetries: number;
@@ -140,7 +140,7 @@ export interface BillSubmissionOffline {
   billNumber: string;
   imageData: string;
   imageName: string;
-  selectedItems: any; // JSON data
+  selectedItems: Record<string, unknown>[]; // JSON data
   userId: string;
   processed: boolean;
   createdAt: Date;
@@ -150,7 +150,7 @@ export interface BillSubmissionOffline {
 
 export interface UserPreference {
   key: string;
-  value: any;
+  value: unknown;
   lastModified: Date;
 }
 

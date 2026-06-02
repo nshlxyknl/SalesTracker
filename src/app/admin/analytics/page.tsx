@@ -481,13 +481,22 @@ export default function AnalyticsPage() {
                           {user.recentSales.map(sale => (
                             <div key={sale.id} className="flex justify-between items-center p-2 bg-white rounded border">
                               <div>
-                                <p className="font-medium">{sale.itemName}</p>
+                                <p className="font-medium">
+                                  {sale.itemName}
+                                  {sale.unitPrice === 0 && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                      Scheme
+                                    </span>
+                                  )}
+                                </p>
                                 <p className="text-sm text-gray-600">
                                   Bill #{sale.billNumber} • {new Date(sale.createdAt).toLocaleDateString()}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold">Rs {sale.totalAmount.toFixed(2)}</p>
+                                <p className="font-semibold">
+                                  {sale.unitPrice === 0 ? "—" : `Rs ${sale.totalAmount.toFixed(2)}`}
+                                </p>
                                 <p className="text-sm text-gray-600 capitalize">{sale.paymentMethod}</p>
                               </div>
                             </div>

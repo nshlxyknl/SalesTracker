@@ -110,7 +110,10 @@ export default function UserPanelPage() {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam && ['assign', 'summary', 'returns'].includes(tabParam)) {
-      setActiveTab(tabParam as "assign" | "summary" | "returns");
+      const timeoutId = setTimeout(() => {
+        setActiveTab(tabParam as "assign" | "summary" | "returns");
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [searchParams]);
 

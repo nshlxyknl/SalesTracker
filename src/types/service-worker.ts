@@ -24,7 +24,7 @@ export interface ServiceWorkerClient {
   id: string;
   type: 'window' | 'worker' | 'sharedworker';
   url: string;
-  postMessage(message: any): void;
+  postMessage(message: unknown): void;
 }
 
 export interface ClientQueryOptions {

@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { syncManager, queueSyncOperation, getSyncStatus, forceSyncNow } from '../lib/sync-manager';
+import { syncManager, queueSyncOperation, getSyncStatus, forceSyncNow, ConflictResolution } from '../lib/sync-manager';
 import { SyncResult, QueueStatus, SyncOperation } from '../types/pwa';
 
 interface SyncContextType {
@@ -26,13 +26,13 @@ interface SyncContextType {
   refreshStatus: () => Promise<void>;
   
   // Conflict management
-  pendingConflicts: any[];
-  resolveConflict: (conflictId: string, resolution: any) => Promise<void>;
+  pendingConflicts: unknown[];
+  resolveConflict: (conflictId: string, resolution: ConflictResolution) => Promise<void>;
   
   // Event handlers
   onSyncComplete?: (results: SyncResult[]) => void;
   onSyncError?: (error: Error) => void;
-  onConflictDetected?: (conflict: any) => void;
+  onConflictDetected?: (conflict: unknown) => void;
 }
 
 const SyncContext = createContext<SyncContextType | null>(null);
@@ -41,7 +41,7 @@ interface SyncProviderProps {
   children: ReactNode;
   onSyncComplete?: (results: SyncResult[]) => void;
   onSyncError?: (error: Error) => void;
-  onConflictDetected?: (conflict: any) => void;
+  onConflictDetected?: (conflict: unknown) => void;
 }
 
 export function SyncProvider({ 
@@ -62,7 +62,7 @@ export function SyncProvider({
   );
   
   const [isSyncing, setIsSyncing] = useState(false);
-  const [pendingConflicts, setPendingConflicts] = useState<any[]>([]);
+  const [pendingConflicts, setPendingConflicts] = useState<unknown[]>([]);
 
   // Refresh sync status
   const refreshStatus = useCallback(async () => {
@@ -103,14 +103,19 @@ export function SyncProvider({
 
   // Initialize and set up periodic status refresh
   useEffect(() => {
-    refreshStatus();
+    const timeoutId = setTimeout(() => {
+      refreshStatus();
+    }, 0);
     
     // Refresh status every 30 seconds
     const interval = setInterval(() => {
       refreshStatus();
     }, 30000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [refreshStatus]);
 
   // Queue a sync operation
@@ -180,7 +185,7 @@ export function SyncProvider({
   }, [isSyncing, onSyncError, refreshStatus]);
 
   // Resolve a conflict
-  const resolveConflict = useCallback(async (conflictId: string, resolution: any) => {
+  const resolveConflict = useCallback(async (conflictId: string, resolution: ConflictResolution) => {
     try {
       await syncManager.getInstance().resolveConflict(conflictId, resolution);
       await refreshStatus();

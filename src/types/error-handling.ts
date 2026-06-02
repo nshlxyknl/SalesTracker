@@ -9,7 +9,7 @@
 export interface ServiceWorkerErrorHandler {
   handleRegistrationFailure(error: Error): void;
   handleCacheFailure(error: Error, resource: string): void;
-  handleSyncFailure(error: Error, operation: any): void;
+  handleSyncFailure(error: Error, operation: Record<string, unknown>): void;
   handleUpdateAvailable(): void;
 }
 
@@ -22,22 +22,22 @@ export interface OfflineStorageErrorHandler {
 
 // Sync Conflict Resolution
 export interface SyncConflictResolver {
-  resolveConflict(localData: any, serverData: any): ConflictResolution;
+  resolveConflict(localData: Record<string, unknown>, serverData: Record<string, unknown>): ConflictResolution;
   handleMergeFailure(error: Error): void;
   notifyUser(conflict: SyncConflict): void;
 }
 
 export interface ConflictResolution {
   strategy: 'server_wins' | 'client_wins' | 'merge' | 'user_choice';
-  resolvedData: any;
+  resolvedData: Record<string, unknown>;
   requiresUserInput: boolean;
 }
 
 export interface SyncConflict {
   id: string;
   type: 'data_conflict' | 'version_conflict' | 'deletion_conflict';
-  localData: any;
-  serverData: any;
+  localData: Record<string, unknown>;
+  serverData: Record<string, unknown>;
   timestamp: Date;
   description: string;
 }

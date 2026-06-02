@@ -44,7 +44,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
     // Check if app is already installed
     const checkIfInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const isInWebAppiOS = (window.navigator as any).standalone === true;
+      const isInWebAppiOS = (window.navigator as { standalone?: boolean }).standalone === true;
       const isInstalled = isStandalone || isInWebAppiOS;
       
       setIsInstalled(isInstalled);
@@ -150,7 +150,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
           console.log('User accepted the PWA install prompt');
           // Track installation success
           if ('gtag' in window) {
-            (window as any).gtag('event', 'pwa_install', {
+            (window as { gtag?: (...args: unknown[]) => void }).gtag?.('event', 'pwa_install', {
               event_category: 'engagement',
               event_label: 'accepted'
             });
@@ -202,7 +202,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
   // Add PWA context to window for global access
   useEffect(() => {
-    (window as any).pwaContext = pwaContext;
+    (window as { pwaContext?: unknown }).pwaContext = pwaContext;
   }, [pwaContext]);
 
   return (
@@ -268,7 +268,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
 // Hook to use PWA functionality
 export function usePWA() {
-  return (window as any).pwaContext || {
+  return (window as { pwaContext?: unknown }).pwaContext || {
     isInstallable: false,
     isInstalled: false,
     installPWA: () => {},

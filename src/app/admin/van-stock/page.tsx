@@ -98,11 +98,14 @@ export default function VanStockPage() {
   // Update return rows when loads change
   useEffect(() => {
     if (loads.length > 0) {
-      setReturnRows(loads.map(load => ({
-        itemName: load.itemName,
-        returned: load.returned || "",
-        loadId: load.id
-      })));
+      const timeoutId = setTimeout(() => {
+        setReturnRows(loads.map(load => ({
+          itemName: load.itemName,
+          returned: load.returned || "",
+          loadId: load.id
+        })));
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
   }, [loads]);
 

@@ -11,7 +11,7 @@ export interface SyncOperation {
   id: string;
   type: 'CREATE' | 'UPDATE' | 'DELETE';
   endpoint: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
   retryCount: number;
   maxRetries: number;
@@ -176,7 +176,7 @@ class IndexedDBManager implements OfflineStorageManager {
   }
 
   // Van loads specific methods
-  async storeVanLoad(vanLoad: any): Promise<void> {
+  async storeVanLoad(vanLoad: Record<string, unknown>): Promise<void> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.VAN_LOADS], 'readwrite');
     const store = transaction.objectStore(STORES.VAN_LOADS);
@@ -195,12 +195,12 @@ class IndexedDBManager implements OfflineStorageManager {
     });
   }
 
-  async getVanLoads(userId?: string): Promise<any[]> {
+  async getVanLoads(userId?: string): Promise<Record<string, unknown>[]> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.VAN_LOADS], 'readonly');
     const store = transaction.objectStore(STORES.VAN_LOADS);
     
-    return new Promise<any[]>((resolve, reject) => {
+    return new Promise<Record<string, unknown>[]>((resolve, reject) => {
       let request: IDBRequest;
       
       if (userId) {
@@ -216,7 +216,7 @@ class IndexedDBManager implements OfflineStorageManager {
   }
 
   // Sales specific methods
-  async storeSale(sale: any): Promise<void> {
+  async storeSale(sale: Record<string, unknown>): Promise<void> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.SALES], 'readwrite');
     const store = transaction.objectStore(STORES.SALES);
@@ -235,12 +235,12 @@ class IndexedDBManager implements OfflineStorageManager {
     });
   }
 
-  async getSales(userId?: string): Promise<any[]> {
+  async getSales(userId?: string): Promise<Record<string, unknown>[]> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.SALES], 'readonly');
     const store = transaction.objectStore(STORES.SALES);
     
-    return new Promise<any[]>((resolve, reject) => {
+    return new Promise<Record<string, unknown>[]>((resolve, reject) => {
       let request: IDBRequest;
       
       if (userId) {
@@ -256,7 +256,7 @@ class IndexedDBManager implements OfflineStorageManager {
   }
 
   // Bill submissions specific methods
-  async storeBillSubmission(billSubmission: any): Promise<void> {
+  async storeBillSubmission(billSubmission: Record<string, unknown>): Promise<void> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.BILL_SUBMISSIONS], 'readwrite');
     const store = transaction.objectStore(STORES.BILL_SUBMISSIONS);
@@ -275,12 +275,12 @@ class IndexedDBManager implements OfflineStorageManager {
     });
   }
 
-  async getBillSubmissions(userId?: string): Promise<any[]> {
+  async getBillSubmissions(userId?: string): Promise<Record<string, unknown>[]> {
     const db = await this.getDB();
     const transaction = db.transaction([STORES.BILL_SUBMISSIONS], 'readonly');
     const store = transaction.objectStore(STORES.BILL_SUBMISSIONS);
     
-    return new Promise<any[]>((resolve, reject) => {
+    return new Promise<Record<string, unknown>[]>((resolve, reject) => {
       let request: IDBRequest;
       
       if (userId) {
@@ -380,7 +380,7 @@ class SyncQueueManager implements SyncQueue {
 
 // Singleton instances
 export const offlineStorage = new IndexedDBManager();
-export const syncQueue = new SyncQueueManager(offlineStorage as any);
+export const syncQueue = new SyncQueueManager(offlineStorage);
 
 // Utility functions
 export function generateLocalId(): string {

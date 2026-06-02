@@ -111,11 +111,16 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
     });
 
     // Validate stock availability
+    const requestedQuantities = new Map<string, number>();
     for (const item of items) {
-      const availableStock = stockMap.get(item.itemName) || 0;
-      if (availableStock < item.quantity) {
+      requestedQuantities.set(item.itemName, (requestedQuantities.get(item.itemName) || 0) + item.quantity);
+    }
+
+    for (const [itemName, totalRequested] of requestedQuantities.entries()) {
+      const availableStock = stockMap.get(itemName) || 0;
+      if (availableStock < totalRequested) {
         return Response.json({ 
-          error: `Insufficient stock for ${item.itemName}. Available: ${availableStock}, Requested: ${item.quantity}` 
+          error: `Insufficient stock for ${itemName}. Available: ${availableStock}, Requested: ${totalRequested}` 
         }, { status: 400 });
       }
     }

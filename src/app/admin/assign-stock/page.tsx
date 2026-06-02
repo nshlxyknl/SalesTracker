@@ -87,6 +87,7 @@ export default function AssignStockPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copyFromDate, setCopyFromDate] = useState("");
+  const [importingYesterday, setImportingYesterday] = useState(false);
   const [importPreviousDay, setImportPreviousDay] = useState(false);
 
   // Calculate total bottles for an item
@@ -303,6 +304,98 @@ export default function AssignStockPage() {
     await copyFromPreviousDate(previousDate);
   };
 
+  const importYesterdayReturns = async () => {
+    setImportingYesterday(true);
+    setMessage(null);
+
+    try {
+      // Calculate yesterday's date
+      const yesterday = new Date(selectedDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = toDateStr(yesterday);
+
+      // Fetch yesterday's van loads to get returned stock
+      const res = await fetch(`/api/admin/van-loads?date=${yesterdayStr}`);
+      if (!res.ok) throw new Error("Failed to fetch yesterday's data");
+      
+      const yesterdayLoads: VanLoad[] = await res.json();
+      
+      if (yesterdayLoads.length === 0) {
+        setMessage({ type: "error", text: "No stock found for yesterday" });
+        return;
+      }
+
+      // Fetch yesterday's sales to calculate actual returns
+      const salesRes = await fetch(`/api/sales?date=${yesterdayStr}`);
+      const yesterdaySales: Array<{ userId: string; itemName: string; quantity: number }> = salesRes.ok ? await salesRes.json() : [];
+
+      // Group by user and item to calculate returned stock
+      const userReturnedStockMap = new Map<string, Map<string, number>>();
+
+      // Process loads (what was given to users)
+      yesterdayLoads.forEach(load => {
+        if (!userReturnedStockMap.has(load.userId)) {
+          userReturnedStockMap.set(load.userId, new Map());
+        }
+        const userMap = userReturnedStockMap.get(load.userId)!;
+        const currentQuantity = userMap.get(load.itemName) || 0;
+        userMap.set(load.itemName, currentQuantity + load.loaded);
+      });
+
+      // Subtract sales from loaded quantity to get returned stock
+      yesterdaySales.forEach((sale: { userId: string; itemName: string; quantity: number }) => {
+        if (userReturnedStockMap.has(sale.userId)) {
+          const userMap = userReturnedStockMap.get(sale.userId)!;
+          const currentQuantity = userMap.get(sale.itemName) || 0;
+          userMap.set(sale.itemName, Math.max(0, currentQuantity - sale.quantity));
+        }
+      });
+
+      // Convert to stock assignments format
+      const updatedAssignments = assignments.map(assignment => {
+        const userReturnedStock = userReturnedStockMap.get(assignment.userId);
+        if (userReturnedStock && userReturnedStock.size > 0) {
+          const items: StockItem[] = Array.from(userReturnedStock.entries())
+            .filter(([, quantity]) => quantity > 0)
+            .map(([itemName, totalBottles]) => {
+              const itemConfig = getItemByName(itemName);
+              const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+              const { cases, bottles } = convertBottlesToCases(totalBottles, bottlesPerCase);
+              return {
+                itemName,
+                cases,
+                bottles,
+                casePrice: 0, // Will need to be set manually after import
+                schemeBottles: 0, // Will need to be set manually after import
+                totalBottles
+              };
+            });
+
+          if (items.length > 0) {
+            return {
+              ...assignment,
+              items,
+              totalItems: items.reduce((sum, item) => sum + item.totalBottles, 0)
+            };
+          }
+        }
+        return assignment;
+      });
+
+      setAssignments(updatedAssignments);
+      
+      const importedUsers = updatedAssignments.filter(a => a.totalItems > 0).length;
+      setMessage({ 
+        type: "success", 
+        text: `Imported yesterday's returned stock for ${importedUsers} user(s). You can now add additional stock as needed.` 
+      });
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to import yesterday's returns" });
+    } finally {
+      setImportingYesterday(false);
+    }
+  };
+
   const clearAllAssignments = () => {
     const clearedAssignments = assignments.map(assignment => ({
       ...assignment,
@@ -473,6 +566,11 @@ export default function AssignStockPage() {
                 Import Yesterday
               </Button>
             </div>
+
+            <Button onClick={importYesterdayReturns} variant="outline" disabled={importingYesterday}>
+              <Package className="h-4 w-4 mr-2" />
+              {importingYesterday ? "Importing..." : "Import Yesterday's Returns"}
+            </Button>
             
             <Button onClick={clearAllAssignments} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -591,12 +689,15 @@ export default function AssignStockPage() {
                             </div>
 
                             <div className="w-28">
-                              <label className="block text-xs text-gray-500 mb-1">Case Price</label>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Case Price (₹)
+                              </label>
                               <Input
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 placeholder="0"
+                                title="Price per case in Rupees (e.g., 735 for NP-250ml)"
                                 value={item.casePrice}
                                 onChange={(e) => {
                                   const v = e.target.value;
@@ -611,11 +712,15 @@ export default function AssignStockPage() {
                             </div>
 
                             <div className="w-24">
-                              <label className="block text-xs text-gray-500 mb-1">Scheme</label>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Scheme Bottles
+                                <span className="text-gray-400 ml-1" title="Free bottles given per case">ⓘ</span>
+                              </label>
                               <Input
                                 type="number"
                                 min="0"
                                 placeholder="0"
+                                title="Number of free bottles given with each case (e.g., 2 or 3)"
                                 value={item.schemeBottles}
                                 onChange={(e) => {
                                   const v = e.target.value;
@@ -657,14 +762,19 @@ export default function AssignStockPage() {
                             <div>{bottlesPerCase} bottles</div>
                           </div>
 
-                          <div className="text-xs text-gray-600 text-center min-w-28">
-                            <div>Loaded bottles</div>
-                            <div className="font-semibold text-gray-900">{item.totalBottles}</div>
-                            <div>
-                              {Number(item.casePrice) > 0 && item.totalBottles > 0
-                                ? `Rs ${(Number(item.casePrice) / item.totalBottles).toFixed(2)} / bottle`
-                                : "Set case price"}
-                            </div>
+                          <div className="text-xs text-gray-600 text-center min-w-32">
+                            <div>Total Stock Info</div>
+                            <div className="font-semibold text-gray-900">{item.totalBottles} bottles</div>
+                            {Number(item.schemeBottles) > 0 && (
+                              <div className="text-blue-600 bg-blue-50 px-1 py-0.5 rounded mt-1">
+                                +{(Number(item.cases) || 0) * Number(item.schemeBottles)} scheme bottles
+                              </div>
+                            )}
+                            {Number(item.casePrice) > 0 && item.totalBottles > 0 && (
+                              <div className="text-green-600">
+                                ₹{(Number(item.casePrice) / bottlesPerCase).toFixed(2)}/bottle
+                              </div>
+                            )}
                           </div>
                           
                           {assignment.items.length > 1 && (
@@ -718,13 +828,20 @@ export default function AssignStockPage() {
                     const itemConfig = getItemByName(item.itemName);
                     const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
                     const displayText = formatCaseBottleDisplay(item.totalBottles, bottlesPerCase);
-                    const rateText = Number(item.casePrice) > 0 && item.totalBottles > 0
-                      ? `Rs ${(Number(item.casePrice) / item.totalBottles).toFixed(2)} / bottle`
-                      : "No case price";
+                    const casePrice = Number(item.casePrice) || 0;
+                    const schemeBottles = Number(item.schemeBottles) || 0;
                     
                     return (
-                      <div key={index} className="text-xs text-green-700">
-                        {item.itemName}: {displayText} · {rateText}
+                      <div key={index} className="text-xs text-green-700 space-y-1">
+                        <div className="font-medium">{item.itemName}: {displayText}</div>
+                        {casePrice > 0 && (
+                          <div>Price: ₹{casePrice} per case</div>
+                        )}
+                        {schemeBottles > 0 && (
+                          <div className="text-blue-700 bg-blue-50 px-2 py-1 rounded">
+                            Scheme: +{schemeBottles} free bottles per case
+                          </div>
+                        )}
                       </div>
                     );
                   })}
