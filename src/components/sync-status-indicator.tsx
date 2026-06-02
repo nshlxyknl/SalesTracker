@@ -79,15 +79,16 @@ export function SyncStatusIndicator({
         <span className={`text-sm font-medium ${getStatusColor()}`}>
           {getStatusText()}
         </span>
-        {(queueStatus.pendingOperations > 0 || queueStatus.failedOperations > 0) && isOnline && (
+        {(queueStatus.pendingOperations > 0 || queueStatus.failedOperations > 0) && (
           <Button
             size="sm"
             variant="outline"
             onClick={handleForcSync}
-            disabled={isSyncing}
+            disabled={isSyncing || !isOnline}
             className="text-xs px-2 py-1"
+            title={!isOnline ? "Will sync when back online" : "Upload pending data to server"}
           >
-            {isSyncing ? 'Syncing...' : 'Sync'}
+            {isSyncing ? "Syncing..." : isOnline ? "Sync" : "Offline"}
           </Button>
         )}
       </div>
@@ -122,13 +123,13 @@ export function SyncStatusIndicator({
             </Button>
           )}
           
-          {isOnline && (queueStatus.pendingOperations > 0 || queueStatus.failedOperations > 0) && (
+          {(queueStatus.pendingOperations > 0 || queueStatus.failedOperations > 0) && (
             <Button
               size="sm"
               onClick={handleForcSync}
-              disabled={isSyncing}
+              disabled={isSyncing || !isOnline}
             >
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
+              {isSyncing ? "Syncing..." : isOnline ? "Sync Now" : "Offline — sync later"}
             </Button>
           )}
         </div>

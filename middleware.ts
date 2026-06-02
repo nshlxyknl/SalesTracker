@@ -29,7 +29,8 @@ const PUBLIC_ROUTES = [
   '/api/auth/signup',
   '/api/auth/signout',
   '/manifest.json',
-  '/sw.js',
+  '/serwist',
+  '/~offline',
   '/offline.html',
   '/_next',
   '/icons',
@@ -43,6 +44,9 @@ function isPublicRoute(pathname: string): boolean {
     }
     if (route === '/icons') {
       return pathname.startsWith('/icons');
+    }
+    if (route === '/serwist') {
+      return pathname.startsWith('/serwist');
     }
     return pathname === route;
   });

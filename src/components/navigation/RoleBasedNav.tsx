@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getNavItemsForUser, getDefaultRoute } from "@/lib/rbac";
+import { SyncStatusIndicator } from "@/components/sync-status-indicator";
 
 // Icon mapping for dynamic icon rendering
 const ICON_MAP = {
@@ -85,6 +86,8 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
               </span>
             )}
           </div>
+
+          <SyncStatusIndicator compact />
           
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">
@@ -145,6 +148,10 @@ export function RoleBasedNav({ children, showSidebar = true }: RoleBasedNavProps
               {isAdmin ? 'Admin' : 'User'}
             </p>
           </div>
+        </div>
+
+        <div className="px-3 py-2 border-b border-gray-100">
+          <SyncStatusIndicator compact />
         </div>
 
         {/* Navigation */}

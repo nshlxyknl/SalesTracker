@@ -8,6 +8,13 @@ import { ITEMS, formatCaseBottleDisplay, getItemByName, convertBottlesToCases } 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertCircle, CheckCircle } from "lucide-react";
 import { RoleBasedNav } from "@/components/navigation/RoleBasedNav";
+import { SyncStatusIndicator } from "@/components/sync-status-indicator";
+import {
+  getPendingSales,
+  pendingSalesToDisplayRows,
+  submitSaleWithOfflineSupport,
+} from "@/lib/offline-sales";
+import { useSync } from "@/components/sync-provider";
 
 type Sale = {
   id: string;
@@ -20,6 +27,7 @@ type Sale = {
   paymentMethod: string;
   billImageBase64: string | null;
   createdAt: string;
+  pendingSync?: boolean;
 };
 
 type UserStock = {
@@ -80,6 +88,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const queryClient = useQueryClient();
+  const { isOnline, forceSyncAll, refreshStatus } = useSync();
 
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
@@ -89,6 +98,12 @@ export default function DashboardPage() {
     queryKey: ["sales", selectedDate],
     queryFn: () => fetchSales(selectedDate),
     enabled: !!session?.user,
+  });
+
+  const { data: pendingSales = [], refetch: refetchPending } = useQuery({
+    queryKey: ["pending-sales", session?.user?.id],
+    queryFn: () => getPendingSales(session?.user?.id),
+    enabled: !!session?.user?.id,
   });
 
   const { data: stockData, isLoading: stockLoading } = useQuery<StockResponse>({
@@ -152,24 +167,32 @@ export default function DashboardPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!session?.user) return;
     setSubmitting(true);
     setFormMsg(null);
 
-    const fd = new FormData();
-    fd.append("billTitle", billTitle.trim());
-    fd.append("items", JSON.stringify(lines.map((l) => ({
+    const items = lines.map((l) => ({
       itemName: l.item.name,
       quantity: l.totalQuantity,
       unitPrice: l.totalQuantity > 0 ? l.totalAmount / l.totalQuantity : 0,
-    }))));
-    fd.append("paymentMethod", paymentMethod);
-    if (billFile) fd.append("billImage", billFile);
+    }));
 
-    const res = await fetch("/api/sales", { method: "POST", body: fd });
+    const result = await submitSaleWithOfflineSupport({
+      userId: session.user.id,
+      billTitle: billTitle.trim(),
+      items,
+      paymentMethod,
+      billFile,
+    });
     setSubmitting(false);
 
-    if (res.ok) {
-      setFormMsg({ type: "success", text: "Sale recorded." });
+    if (result.ok) {
+      setFormMsg({
+        type: "success",
+        text: result.offline
+          ? "Sale saved on this device. It will sync when you are online (or tap Sync Now)."
+          : "Sale recorded.",
+      });
       setLines([newLine()]);
       setBillTitle("");
       setBillFile(null);
@@ -177,17 +200,17 @@ export default function DashboardPage() {
       if (fileRef.current) fileRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["sales", selectedDate] });
       queryClient.invalidateQueries({ queryKey: ["user-stock", selectedDate] });
-      if (selectedDate !== today) {
-        queryClient.invalidateQueries({ queryKey: ["sales", today] });
-        queryClient.invalidateQueries({ queryKey: ["user-stock", today] });
+      refetchPending();
+      refreshStatus();
+      if (!result.offline && isOnline) {
+        try {
+          await forceSyncAll();
+        } catch {
+          /* queue may still have other items */
+        }
       }
     } else {
-      let msg = "Something went wrong.";
-      try {
-        const data = await res.json();
-        msg = data.error ?? msg;
-      } catch {}
-      setFormMsg({ type: "error", text: msg });
+      setFormMsg({ type: "error", text: result.error ?? "Something went wrong." });
     }
   }
 
@@ -199,10 +222,35 @@ export default function DashboardPage() {
     );
   }
   
-  // Filter sales based on payment method
-  const filteredSales = paymentFilter === "all" 
-    ? sales 
-    : sales.filter(sale => sale.paymentMethod === paymentFilter);
+  const pendingRows = pendingSalesToDisplayRows(pendingSales);
+  const pendingForDate = pendingRows.filter((row) => {
+    const rowDate = row.createdAt.split("T")[0];
+    return rowDate === selectedDate;
+  });
+
+  const allSales: Sale[] = [
+    ...sales,
+    ...pendingForDate.map((row) => ({
+      id: row.id,
+      billNumber: row.billNumber,
+      billTitle: row.billTitle,
+      itemName: row.itemName,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      totalAmount: row.totalAmount,
+      paymentMethod: row.paymentMethod,
+      billImageBase64: row.billImageBase64,
+      createdAt: row.createdAt,
+      pendingSync: row.pendingSync,
+    })),
+  ].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  const filteredSales =
+    paymentFilter === "all"
+      ? allSales
+      : allSales.filter((sale) => sale.paymentMethod === paymentFilter);
   
   const totalRevenue = filteredSales.reduce((s, x) => s + x.totalAmount, 0);
 
@@ -212,11 +260,12 @@ export default function DashboardPage() {
         {/* Stock Display */}
         <div className="lg:col-span-2">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-6">
-            <div className="flex items-center justify-between mb-4 gap-2">
+            <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5" />
                 My Stock
               </h2>
+              <SyncStatusIndicator compact className="shrink-0" />
               <input
                 type="date"
                 value={selectedDate}
@@ -681,7 +730,12 @@ export default function DashboardPage() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredSales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-xs font-mono text-gray-500">{sale.billNumber}</td>
+                        <td className="px-4 py-3 text-xs font-mono text-gray-500">
+                          {sale.billNumber}
+                          {sale.pendingSync && (
+                            <span className="ml-1 text-amber-600 font-sans">(pending)</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-900">{sale.billTitle || "Untitled Bill"}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{sale.itemName}</td>
                         <td className="px-4 py-3 text-gray-500">{sale.quantity}</td>

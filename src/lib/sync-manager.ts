@@ -7,6 +7,7 @@
  */
 
 import { offlineStorage, syncQueue, generateLocalId, isOnline, addOnlineListener, addOfflineListener } from './offline-storage';
+import { markPendingSaleSynced, type PendingSalePayload } from './offline-sales';
 import { SyncOperation, SyncResult, QueueStatus, SyncManager as ISyncManager } from '../types/pwa';
 
 export interface SyncConflict {
@@ -291,23 +292,46 @@ export class SyncManager implements ISyncManager {
    * Execute HTTP request for sync operation
    */
   private async executeHttpRequest(operation: SyncOperation): Promise<Response> {
-    const url = operation.endpoint;
-    const options: RequestInit = {
-      method: this.getHttpMethod(operation.type),
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    };
+    let requestUrl = operation.endpoint;
 
-    // Add body for CREATE and UPDATE operations
-    if (operation.type === 'CREATE' || operation.type === 'UPDATE') {
-      options.body = JSON.stringify(operation.data);
+    if (operation.type === 'DELETE' && operation.data?.id) {
+      requestUrl = `${requestUrl}?id=${operation.data.id}`;
     }
 
-    // Add query parameters for DELETE operations if needed
-    let requestUrl = url;
-    if (operation.type === 'DELETE' && operation.data?.id) {
-      requestUrl = `${url}?id=${operation.data.id}`;
+    // Sales API expects multipart FormData (same as dashboard submit)
+    if (operation.endpoint === '/api/sales' && operation.type === 'CREATE') {
+      const data = operation.data as PendingSalePayload;
+      const formData = new FormData();
+      formData.append('billTitle', data.billTitle || 'Untitled Bill');
+      formData.append('items', JSON.stringify(data.items));
+      formData.append('paymentMethod', data.paymentMethod);
+
+      if (data.billImageBase64 && data.billImageName) {
+        const imageResponse = await fetch(data.billImageBase64);
+        const blob = await imageResponse.blob();
+        formData.append(
+          'billImage',
+          new File([blob], data.billImageName, { type: blob.type || 'image/jpeg' })
+        );
+      }
+
+      return fetch(requestUrl, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+    }
+
+    const options: RequestInit = {
+      method: this.getHttpMethod(operation.type),
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (operation.type === 'CREATE' || operation.type === 'UPDATE') {
+      options.body = JSON.stringify(operation.data);
     }
 
     return fetch(requestUrl, options);
@@ -418,9 +442,9 @@ export class SyncManager implements ISyncManager {
         console.log(`[SyncManager] Updated van load ${operation.data.localId} sync status`);
       }
 
-      if (operation.endpoint.includes('/sales')) {
-        // Update sale sync status
-        console.log(`[SyncManager] Updated sale ${operation.data.localId} sync status`);
+      if (operation.endpoint.includes('/sales') && operation.data?.localId) {
+        await markPendingSaleSynced(operation.data.localId);
+        console.log(`[SyncManager] Marked pending sale ${operation.data.localId} as synced`);
       }
 
       if (operation.endpoint.includes('/bill-submissions')) {

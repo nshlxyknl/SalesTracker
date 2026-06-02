@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "path";
+import { withSerwist } from "@serwist/turbopack";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -10,7 +11,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/sw.js',
+        source: '/serwist/sw.js',
         headers: [
           {
             key: 'Cache-Control',
@@ -39,4 +40,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

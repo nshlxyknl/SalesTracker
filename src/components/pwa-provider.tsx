@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { requestPersistentStorage } from '@/lib/persistent-storage';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -19,7 +20,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null);
 
   // Function to show update notification
   const showUpdateNotification = () => {
@@ -69,64 +70,45 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
     checkIfInstalled();
 
-    // Register service worker with enhanced error handling
-    const registerServiceWorker = async () => {
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js', {
-            scope: '/',
-            updateViaCache: 'none' // Always check for updates
-          });
-          
-          setSwRegistration(registration);
-          console.log('Service Worker registered successfully:', registration);
-
-          // Handle service worker updates with user notification
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New service worker is available - show update notification
-                  console.log('New service worker available');
-                  showUpdateNotification();
-                }
-              });
-            }
-          });
-
-          // Listen for messages from service worker
-          navigator.serviceWorker.addEventListener('message', (event) => {
-            console.log('Message from service worker:', event.data);
-            
-            if (event.data.type === 'SYNC_COMPLETE') {
-              console.log('Offline data sync completed');
-              showSyncNotification('Data synced successfully', 'success');
-            }
-            
-            if (event.data.type === 'SYNC_FAILED') {
-              console.error('Offline data sync failed:', event.data.error);
-              showSyncNotification('Sync failed - will retry later', 'error');
-            }
-            
-            if (event.data.type === 'CACHE_UPDATED') {
-              console.log('Cache updated with new content');
-            }
-          });
-
-          // Check for updates periodically
-          setInterval(() => {
-            registration.update();
-          }, 60000); // Check every minute
-
-        } catch (error) {
-          console.error('Service Worker registration failed:', error);
-          // Graceful degradation - app still works without SW
-        }
+    // Request persistent storage so offline sales are not evicted
+    requestPersistentStorage().then((state) => {
+      setStoragePersisted(state.persisted);
+      if (!state.persisted && state.supported) {
+        console.log('[PWA] Persistent storage not granted — data may be cleared under storage pressure');
       }
-    };
+    });
 
-    registerServiceWorker();
+    // Serwist registers the service worker via SerwistProvider
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                showUpdateNotification();
+              }
+            });
+          }
+        });
+
+        setInterval(() => {
+          registration.update();
+        }, 60000);
+      });
+
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        console.log("Message from service worker:", event.data);
+
+        if (event.data?.type === "SYNC_COMPLETE") {
+          showSyncNotification("Data synced successfully", "success");
+        }
+
+        if (event.data?.type === "SYNC_FAILED") {
+          showSyncNotification("Sync failed - will retry later", "error");
+        }
+      });
+    }
 
     // Handle PWA install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -191,14 +173,19 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
   // Function to check for service worker updates
   const checkForUpdates = async () => {
-    if (swRegistration) {
-      try {
-        await swRegistration.update();
-        console.log('Checked for service worker updates');
-      } catch (error) {
-        console.error('Error checking for updates:', error);
-      }
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.update();
+    } catch (error) {
+      console.error("Error checking for updates:", error);
     }
+  };
+
+  const requestStoragePersistence = async () => {
+    const state = await requestPersistentStorage();
+    setStoragePersisted(state.persisted);
+    return state;
   };
 
   // Provide PWA context to children
@@ -207,7 +194,8 @@ export function PWAProvider({ children }: PWAProviderProps) {
     isInstalled,
     installPWA,
     checkForUpdates,
-    swRegistration,
+    storagePersisted,
+    requestStoragePersistence,
     showUpdateNotification,
     showSyncNotification,
   };
@@ -285,6 +273,12 @@ export function usePWA() {
     isInstalled: false,
     installPWA: () => {},
     checkForUpdates: () => {},
-    swRegistration: null,
+    storagePersisted: null,
+    requestStoragePersistence: async () => ({
+      supported: false,
+      persisted: false,
+      quotaBytes: null,
+      usageBytes: null,
+    }),
   };
 }
