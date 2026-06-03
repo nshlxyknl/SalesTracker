@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@/components/offline-auth-provider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,14 +136,19 @@ export default function AssignStockPage() {
         items: [emptyStockItem()],
         totalItems: 0
       }));
-      // Use setTimeout to avoid synchronous state update
-      setTimeout(() => setAssignments(initialAssignments), 0);
+      setAssignments(initialAssignments);
     }
-  }, [users.length, assignments.length, users]);
+    // Only run when users changes, not assignments
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]);
 
-  // Update assignments with existing loads
+  // Update assignments with existing loads - only once when loads are fetched
   useEffect(() => {
     if (existingLoads.length > 0 && assignments.length > 0) {
+      // Check if assignments are already populated with load data
+      const hasLoadData = assignments.some(a => a.items.length > 1 || a.items[0].cases !== "");
+      if (hasLoadData) return; // Already populated, don't update again
+      
       const updatedAssignments = assignments.map(assignment => {
         const userLoads = existingLoads.filter(load => load.userId === assignment.userId);
         if (userLoads.length > 0) {
@@ -168,10 +173,11 @@ export default function AssignStockPage() {
         }
         return assignment;
       });
-      // Use setTimeout to avoid synchronous state update
-      setTimeout(() => setAssignments(updatedAssignments), 0);
+      setAssignments(updatedAssignments);
     }
-  }, [existingLoads.length, assignments.length, assignments, existingLoads]);
+    // Only run when existingLoads changes, not assignments
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingLoads]);
 
   if (isPending || !session?.user) {
     return (

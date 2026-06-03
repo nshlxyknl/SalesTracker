@@ -99,7 +99,9 @@ export default function DashboardPage() {
   const { isOnline, forceSyncAll, refreshStatus } = useSync();
 
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
+  // Lock users to today's date only - they can only see and create sales for today
+  const todayOnly = toDateStr(new Date());
+  const [selectedDate] = useState(() => todayOnly); // Remove setSelectedDate to prevent date changes
   const [lines, setLines] = useState<LineItem[]>([newLine()]);
   const [schemeLines, setSchemeLines] = useState<SchemeLineItem[]>([]);
   const [billTitle, setBillTitle] = useState("");
@@ -294,6 +296,13 @@ export default function DashboardPage() {
     event.preventDefault();
     if (!session?.user) return;
 
+    // Validate that user is only creating sales for today
+    const todayDate = toDateStr(new Date());
+    if (selectedDate !== todayDate) {
+      setFormMsg({ type: "error", text: "You can only create sales for today. Previous dates are read-only." });
+      return;
+    }
+
     if (saleValidationError) {
       setFormMsg({ type: "error", text: saleValidationError });
       return;
@@ -386,7 +395,12 @@ export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 flex flex-col gap-4 sm:gap-6">
       <section className="order-1 bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-sm">
-        <h2 className="text-lg font-semibold mb-5 text-gray-900">New Sale</h2>
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold text-gray-900">New Sale</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            📅 You can only create sales for today using today's assigned stock
+          </p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-600 font-medium mb-1.5">Bill Title</label>
@@ -736,12 +750,10 @@ export default function DashboardPage() {
             </h2>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <OfflineSyncStatus compact className="shrink-0" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+              {/* Date locked to today - users can only work with today's stock */}
+              <div className="bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded-lg px-3 py-1 font-medium">
+                Today: {selectedDate}
+              </div>
               {stockData && (
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${stockData.hasStock ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                   {stockData.hasStock ? (() => {
@@ -773,7 +785,7 @@ export default function DashboardPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                   <span className="text-sm font-medium text-blue-800">
-                    Stock Summary ({selectedDate === today ? "Today" : selectedDate})
+                    Stock Summary (Today)
                   </span>
                   <span className="text-sm text-blue-600">
                     {stockData.stock.length} item{stockData.stock.length > 1 ? "s" : ""} assigned
@@ -895,7 +907,7 @@ export default function DashboardPage() {
                 {paymentFilter !== "all" && <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>}
               </div>
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <p className="text-gray-400 text-xs">{selectedDate === today ? "Today's Bills" : `Bills on ${selectedDate}`}</p>
+                <p className="text-gray-400 text-xs">Today's Bills</p>
                 <p className="text-2xl font-bold mt-1 text-emerald-600">{new Set(filteredSales.map((sale) => sale.billNumber || sale.id)).size}</p>
                 {paymentFilter !== "all" && <p className="text-xs text-gray-500 capitalize">{paymentFilter} only</p>}
               </div>
@@ -908,18 +920,13 @@ export default function DashboardPage() {
             <div>
               <h2 className="font-semibold text-gray-900">My Sales</h2>
               <p className="text-xs text-gray-500 mt-1">
-                {selectedDate === today ? "Today" : selectedDate}
+                Today's sales only
                 {paymentFilter !== "all" && ` · ${paymentFilter} only`}
                 {paymentFilter !== "all" && filteredSales.length !== sales.length && ` (${filteredSales.length} of ${sales.length})`}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+              {/* Removed date picker - users can only see today's sales */}
               <select
                 value={paymentFilter}
                 onChange={(event) => setPaymentFilter(event.target.value)}
@@ -957,8 +964,8 @@ export default function DashboardPage() {
           ) : filteredSales.length === 0 ? (
             <p className="text-gray-400 text-center py-12 text-sm">
               {paymentFilter === "all"
-                ? `No sales on ${selectedDate}.`
-                : `No ${paymentFilter} sales on ${selectedDate}.`}
+                ? `No sales today yet.`
+                : `No ${paymentFilter} sales today yet.`}
             </p>
           ) : (
             <>

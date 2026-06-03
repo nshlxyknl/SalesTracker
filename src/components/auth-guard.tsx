@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@/components/offline-auth-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AuthLoading } from "./auth-loading";
@@ -12,7 +12,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, requireRole, redirectTo = '/login' }: AuthGuardProps) {
-  const { data, isPending, error } = useSession();
+  const { data, isPending } = useSession();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,23 +36,6 @@ export function AuthGuard({ children, requireRole, redirectTo = '/login' }: Auth
 
   if (isPending) {
     return <AuthLoading />;
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Error</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => router.push('/login')}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
   }
 
   if (!data?.user) {

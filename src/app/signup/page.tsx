@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth-client";
-import { useSession } from "@/lib/auth-client";
+import { useSession, useOfflineAuth } from "@/components/offline-auth-provider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { BarChart3, Loader2, Eye, EyeOff, Check, X } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { refresh } = useSession();
+  const { refreshSession } = useOfflineAuth();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -69,7 +69,7 @@ export default function SignupPage() {
         setLoading(false);
       } else {
         // Refresh the session context
-        await refresh();
+        await refreshSession();
         
         // New users get 'user' role by default, redirect to user dashboard
         router.push("/dashboard");
