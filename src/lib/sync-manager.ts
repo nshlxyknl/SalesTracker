@@ -238,12 +238,22 @@ export class SyncManager implements ISyncManager {
       if (response.ok) {
         const responseData = await response.json();
         
-        // Handle potential conflicts
-        if (response.status === 409) { // Conflict status
-          const conflict = await this.handleConflict(operation, responseData);
+        // Check if the sync operation itself succeeded
+        if (responseData.success === false) {
+          return {
+            operationId: operation.id,
+            success: false,
+            error: responseData.error || 'Sync operation failed',
+            timestamp: new Date()
+          };
+        }
+
+        // Handle potential conflicts (409 status in the actual data endpoint)
+        if (response.status === 409) {
+          const conflict = await this.handleConflict(operation, responseData.data || responseData);
           if (conflict.requiresUserInput) {
             // Store conflict for user resolution
-            await this.storeConflictForResolution(operation, responseData);
+            await this.storeConflictForResolution(operation, responseData.data || responseData);
             return {
               operationId: operation.id,
               success: false,
@@ -261,7 +271,7 @@ export class SyncManager implements ISyncManager {
         }
 
         // Update local data with server response if needed
-        await this.updateLocalDataAfterSync(operation, responseData);
+        await this.updateLocalDataAfterSync(operation, responseData.data || responseData);
 
         return {
           operationId: operation.id,
@@ -295,65 +305,23 @@ export class SyncManager implements ISyncManager {
    * Execute HTTP request for sync operation
    */
   private async executeHttpRequest(operation: SyncOperation): Promise<Response> {
-    let requestUrl = operation.endpoint;
-
-    if (operation.type === 'DELETE' && operation.data?.id) {
-      requestUrl = `${requestUrl}?id=${operation.data.id}`;
-    }
-
-    // Sales API expects multipart FormData (same as dashboard submit)
-    if (operation.endpoint === '/api/sales' && operation.type === 'CREATE') {
-      const data = operation.data as PendingSalePayload;
-      const formData = new FormData();
-      formData.append('billTitle', data.billTitle || 'Untitled Bill');
-      formData.append('items', JSON.stringify(data.items));
-      formData.append('paymentMethod', data.paymentMethod);
-
-      if (data.billImageBase64 && data.billImageName) {
-        const imageResponse = await fetch(data.billImageBase64);
-        const blob = await imageResponse.blob();
-        formData.append(
-          'billImage',
-          new File([blob], data.billImageName, { type: blob.type || 'image/jpeg' })
-        );
-      }
-
-      return fetch(requestUrl, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-    }
-
+    // Use the sync API endpoint to process all operations
+    // This ensures proper status tracking in the database
+    const syncApiUrl = '/api/sync';
+    
     const options: RequestInit = {
-      method: this.getHttpMethod(operation.type),
+      method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        action: 'single',
+        ...operation
+      })
     };
 
-    if (operation.type === 'CREATE' || operation.type === 'UPDATE') {
-      options.body = JSON.stringify(operation.data);
-    }
-
-    return fetch(requestUrl, options);
-  }
-
-  /**
-   * Get HTTP method for sync operation type
-   */
-  private getHttpMethod(operationType: string): string {
-    switch (operationType) {
-      case 'CREATE':
-        return 'POST';
-      case 'UPDATE':
-        return 'PUT';
-      case 'DELETE':
-        return 'DELETE';
-      default:
-        return 'POST';
-    }
+    return fetch(syncApiUrl, options);
   }
 
   /**
