@@ -11,6 +11,7 @@ export interface OfflineSale {
   totalAmount: number;
   paymentMethod: 'cash' | 'cheque' | 'credit';
   billImageBase64: string | null;
+  billImageName?: string | null;
   createdAt: string;
   synced: boolean;
   syncAttempts: number;

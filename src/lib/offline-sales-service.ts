@@ -67,6 +67,7 @@ export class OfflineSalesService {
 
       // Generate bill number
       const billNumber = await this.generateBillNumber();
+      const billImageName = request.billFile?.name || undefined;
 
       // Save each item as a separate sale record (matching your existing structure)
       const saleIds: string[] = [];
@@ -82,6 +83,7 @@ export class OfflineSalesService {
           totalAmount: item.quantity * item.unitPrice,
           paymentMethod: request.paymentMethod,
           billImageBase64,
+          billImageName,
           createdAt: new Date().toISOString(),
           synced: false,
           syncAttempts: 0
