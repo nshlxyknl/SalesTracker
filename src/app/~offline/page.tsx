@@ -1,20 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function OfflinePage() {
+  const router = useRouter();
+
+  // Redirect to home page immediately
+  // The app should work offline without showing this page
+  useEffect(() => {
+    router.replace("/");
+  }, [router]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-6 text-center">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">You are offline</h1>
-      <p className="text-gray-600 max-w-md mb-6">
-        Sales Tracker is still available. Your sales are saved on this device and will sync
-        when you are back online, or use Sync Now from the dashboard.
-      </p>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium"
-      >
-        Try again
-      </button>
+      <div className="w-12 h-12 border-2 border-gray-900 border-t-transparent rounded-full animate-spin mb-4" />
+      <p className="text-gray-600">Loading...</p>
     </div>
   );
 }
