@@ -153,6 +153,23 @@ export default function DashboardPage() {
     return { totalQuantity, totalAmount, bottlePrice };
   };
 
+  // Calculate actual available stock including pending sales
+  const getActualAvailableStock = (itemName: string): number => {
+    const stockItem = stockData?.stock.find((stock) => stock.itemName === itemName);
+    if (!stockItem) return 0;
+    
+    // Calculate pending sales for this item from today's date
+    const pendingSalesQty = pendingSales
+      .filter(sale => 
+        sale.itemName === itemName && 
+        sale.createdAt.split("T")[0] === selectedDate
+      )
+      .reduce((sum, sale) => sum + sale.quantity, 0);
+    
+    // Return remaining minus pending
+    return Math.max(0, stockItem.remaining - pendingSalesQty);
+  };
+
   const getItemRequestedQuantity = (itemName: string) => {
     const normalQty = lines
       .filter((l) => l.item.name === itemName)
@@ -179,15 +196,15 @@ export default function DashboardPage() {
       return `Enter a quantity for ${itemName}.`;
     }
 
-    const stockItem = stockData?.stock.find((stock) => stock.itemName === itemName);
-    if (!stockItem || stockItem.remaining <= 0) {
-      return `${itemName} has no available stock.`;
+    const actualAvailable = getActualAvailableStock(itemName);
+    if (actualAvailable <= 0) {
+      return `${itemName} has no available stock (including pending sales).`;
     }
 
     const combinedRequested = getItemRequestedQuantity(itemName);
-    if (combinedRequested > stockItem.remaining) {
+    if (combinedRequested > actualAvailable) {
       const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
-      return `Only ${formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available for ${itemName}.`;
+      return `Only ${formatCaseBottleDisplay(actualAvailable, bottlesPerCase)} available for ${itemName} (after pending sales).`;
     }
 
     return null;
@@ -204,15 +221,15 @@ export default function DashboardPage() {
       return `Enter a quantity for scheme ${itemName}.`;
     }
 
-    const stockItem = stockData?.stock.find((stock) => stock.itemName === itemName);
-    if (!stockItem || stockItem.remaining <= 0) {
-      return `${itemName} has no available stock.`;
+    const actualAvailable = getActualAvailableStock(itemName);
+    if (actualAvailable <= 0) {
+      return `${itemName} has no available stock (including pending sales).`;
     }
 
     const combinedRequested = getItemRequestedQuantity(itemName);
-    if (combinedRequested > stockItem.remaining) {
+    if (combinedRequested > actualAvailable) {
       const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
-      return `Only ${formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase)} available for ${itemName}.`;
+      return `Only ${formatCaseBottleDisplay(actualAvailable, bottlesPerCase)} available for ${itemName} (after pending sales).`;
     }
 
     return null;
@@ -418,9 +435,8 @@ export default function DashboardPage() {
             {lines.map((line, index) => {
               const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
               const { totalQuantity, totalAmount, bottlePrice } = calculateLineItem(line);
-              const stockItem = stockData?.stock.find((stock) => stock.itemName === line.item.name);
-              const availableBottles = stockItem ? stockItem.remaining : 0;
-              const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(availableBottles, bottlesPerCase);
+              const actualAvailable = getActualAvailableStock(line.item.name);
+              const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(actualAvailable, bottlesPerCase);
 
               return (
                 <div key={line.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
@@ -452,15 +468,15 @@ export default function DashboardPage() {
                     className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   >
                     {ITEMS.map((item) => {
-                      const stockItem = stockData?.stock.find((stock) => stock.itemName === item.name);
-                      const hasStock = !!stockItem && stockItem.remaining > 0;
+                      const actualAvailable = getActualAvailableStock(item.name);
+                      const hasStock = actualAvailable > 0;
                       const itemConfig = getItemByName(item.name);
                       const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
-                      const availableDisplay = stockItem ? formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase) : "No stock";
+                      const availableDisplay = formatCaseBottleDisplay(actualAvailable, bottlesPerCase);
 
                       return (
                         <option key={item.name} value={item.name} disabled={!hasStock}>
-                          {item.name} {stockItem ? `(${availableDisplay} available)` : "(No stock)"}
+                          {item.name} ({availableDisplay} available)
                         </option>
                       );
                     })}
@@ -562,9 +578,8 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {schemeLines.map((line, index) => {
                   const bottlesPerCase = line.item.caseInfo.bottlesPerCase;
-                  const stockItem = stockData?.stock.find((stock) => stock.itemName === line.item.name);
-                  const availableBottles = stockItem ? stockItem.remaining : 0;
-                  const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(availableBottles, bottlesPerCase);
+                  const actualAvailable = getActualAvailableStock(line.item.name);
+                  const { cases: availableCases, bottles: availableBottlesRemainder } = convertBottlesToCases(actualAvailable, bottlesPerCase);
 
                   return (
                     <div key={line.id} className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 space-y-2">
@@ -592,15 +607,15 @@ export default function DashboardPage() {
                         className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         {ITEMS.map((item) => {
-                          const stockItem = stockData?.stock.find((stock) => stock.itemName === item.name);
-                          const hasStock = !!stockItem && stockItem.remaining > 0;
+                          const actualAvailable = getActualAvailableStock(item.name);
+                          const hasStock = actualAvailable > 0;
                           const itemConfig = getItemByName(item.name);
                           const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
-                          const availableDisplay = stockItem ? formatCaseBottleDisplay(stockItem.remaining, bottlesPerCase) : "No stock";
+                          const availableDisplay = formatCaseBottleDisplay(actualAvailable, bottlesPerCase);
 
                           return (
                             <option key={item.name} value={item.name} disabled={!hasStock}>
-                              {item.name} {stockItem ? `(${availableDisplay} available)` : "(No stock)"}
+                              {item.name} ({availableDisplay} available)
                             </option>
                           );
                         })}

@@ -26,6 +26,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
     });
 
     // Get user's sales for the specified date to calculate remaining stock
+    // This includes only synced sales from the database
     const sales: SaleQuantity[] = await prisma.sale.findMany({
       where: {
         userId: user.id,
@@ -43,6 +44,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
       sold: number;
       remaining: number;
       returned: number;
+      pendingSold: number; // Track pending sales separately
     }>();
 
     // Add loaded quantities
@@ -54,7 +56,8 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
           loaded: 0,
           sold: 0,
           remaining: 0,
-          returned: load.returned
+          returned: load.returned,
+          pendingSold: 0
         });
       }
       const stock = stockMap.get(key)!;
@@ -62,7 +65,7 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
       stock.returned = load.returned; // Use the latest returned value
     });
 
-    // Subtract sold quantities
+    // Subtract sold quantities from synced sales
     sales.forEach((sale) => {
       const key = sale.itemName;
       if (!stockMap.has(key)) {
@@ -71,14 +74,15 @@ export const GET = withUserOrAdmin(async (request: NextRequest, user) => {
           loaded: 0,
           sold: 0,
           remaining: 0,
-          returned: 0
+          returned: 0,
+          pendingSold: 0
         });
       }
       const stock = stockMap.get(key)!;
       stock.sold += sale.quantity;
     });
 
-    // Calculate remaining stock
+    // Calculate remaining stock (excluding pending for now, client will handle pending)
     const userStock = Array.from(stockMap.values()).map(stock => {
       stock.remaining = stock.loaded - stock.sold - stock.returned;
       return stock;

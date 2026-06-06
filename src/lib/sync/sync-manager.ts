@@ -261,9 +261,10 @@ export class SyncManager {
    * Sync a single sale to the server
    */
   private async syncSingleSale(sale: OfflineSale, authHeaders: Record<string, string>): Promise<void> {
-    // Prepare the sale data for the server
+    // Prepare the sale data - send as items array since sale might be part of a multi-item bill
     const saleData = {
       billTitle: sale.billTitle,
+      billNumber: sale.billNumber,
       items: [{
         itemName: sale.itemName,
         quantity: sale.quantity,
@@ -271,16 +272,36 @@ export class SyncManager {
       }],
       paymentMethod: sale.paymentMethod,
       billImageBase64: sale.billImageBase64,
+      billImageName: sale.billImageName || `${sale.billNumber}.jpg`,
       createdAt: sale.createdAt // Preserve original creation time
     };
+
+    // Use FormData to match the expected format of /api/sales
+    const formData = new FormData();
+    formData.append('billTitle', saleData.billTitle);
+    formData.append('items', JSON.stringify(saleData.items));
+    formData.append('paymentMethod', saleData.paymentMethod);
+    
+    if (saleData.billImageBase64) {
+      // Convert base64 back to blob for upload
+      const byteString = atob(saleData.billImageBase64.split(',')[1] || saleData.billImageBase64);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: 'image/jpeg' });
+      formData.append('billImage', blob, saleData.billImageName);
+    }
 
     const response = await fetch('/api/sales', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // Don't set Content-Type - let browser set it with boundary for FormData
         ...authHeaders
       },
-      body: JSON.stringify(saleData)
+      body: formData,
+      credentials: 'include'
     });
 
     if (!response.ok) {
@@ -291,9 +312,10 @@ export class SyncManager {
     const serverResponse = await response.json();
     
     // Mark as synced in local database
-    await OfflineStore.markSaleAsSynced(sale.id, serverResponse.id || serverResponse.saleId);
+    const serverId = Array.isArray(serverResponse) ? serverResponse[0]?.id : (serverResponse.id || serverResponse.saleId);
+    await OfflineStore.markSaleAsSynced(sale.id, serverId);
     
-    console.log(`Sale ${sale.id} synced successfully`);
+    console.log(`Sale ${sale.id} synced successfully to server ID: ${serverId}`);
   }
 
   /**
