@@ -133,13 +133,16 @@ export const POST = withUserOrAdmin(async (request: NextRequest, user) => {
       billImageName = billFile.name;
     }
 
-    // Count distinct bill numbers this user already has (outside transaction)
-    const existing = await prisma.sale.findMany({
-      where: { userId: user.id, NOT: { billNumber: "" } },
-      select: { billNumber: true },
+    // Increment user's bill counter and generate bill number
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { billCounter: { increment: 1 } },
+      select: { billCounter: true, username: true }
     });
-    const uniqueBills = new Set(existing.map((s) => s.billNumber));
-    const billNumber = String(uniqueBills.size + 1);
+    
+    // Create user-specific bill number format: USERNAME-NUMBER
+    const userPrefix = updatedUser.username.substring(0, 2).toUpperCase();
+    const billNumber = `${userPrefix}-${updatedUser.billCounter}`;
 
     // Create all line items sequentially
     const created = [];

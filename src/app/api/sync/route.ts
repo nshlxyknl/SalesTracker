@@ -407,12 +407,16 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
       // Handle PendingSalePayload with items array (from offline sales)
       if (data.items && Array.isArray(data.items)) {
         // Count distinct bill numbers this user already has
-        const existing = await prisma.sale.findMany({
-          where: { userId: userId, NOT: { billNumber: "" } },
-          select: { billNumber: true },
+        // Increment user's bill counter and generate bill number
+        const updatedUser = await prisma.user.update({
+          where: { id: userId },
+          data: { billCounter: { increment: 1 } },
+          select: { billCounter: true, username: true }
         });
-        const uniqueBills = new Set(existing.map((s) => s.billNumber));
-        const billNumber = String(uniqueBills.size + 1);
+        
+        // Create user-specific bill number format: USERNAME-NUMBER
+        const userPrefix = updatedUser.username.substring(0, 2).toUpperCase();
+        const billNumber = `${userPrefix}-${updatedUser.billCounter}`;
 
         // Create all line items for this bill
         const createdSales = [];

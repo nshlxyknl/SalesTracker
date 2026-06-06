@@ -78,9 +78,13 @@ export function PWAProvider({ children }: PWAProviderProps) {
       }
     });
 
-    // Serwist registers the service worker via SerwistProvider
+    // Trigger manual caching of important pages when app loads
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
+        // Send message to service worker to cache pages
+        registration.active?.postMessage({ type: 'CACHE_PAGES' });
+        console.log('[PWA] Requested service worker to cache pages');
+        
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
           if (newWorker) {
