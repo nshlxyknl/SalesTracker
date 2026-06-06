@@ -387,30 +387,66 @@ async function processSyncVanLoad(operation: SyncOperation, userId: string) {
 async function processSyncSale(operation: SyncOperation, userId: string) {
   const data = operation.data as {
     id?: string;
+    localId?: string;
     billNumber?: string;
     billTitle?: string;
-    itemName: string;
-    quantity: number;
-    unitPrice: number;
-    totalAmount: number;
+    itemName?: string;
+    quantity?: number;
+    unitPrice?: number;
+    totalAmount?: number;
+    items?: Array<{ itemName: string; quantity: number; unitPrice: number }>;
     paymentMethod?: string;
-    billImageBase64?: string;
-    billImageName?: string;
+    billImageBase64?: string | null;
+    billImageName?: string | null;
     createdAt?: string;
     [key: string]: unknown;
   };
   
   switch (operation.type) {
     case 'CREATE':
+      // Handle PendingSalePayload with items array (from offline sales)
+      if (data.items && Array.isArray(data.items)) {
+        // Count distinct bill numbers this user already has
+        const existing = await prisma.sale.findMany({
+          where: { userId: userId, NOT: { billNumber: "" } },
+          select: { billNumber: true },
+        });
+        const uniqueBills = new Set(existing.map((s) => s.billNumber));
+        const billNumber = String(uniqueBills.size + 1);
+
+        // Create all line items for this bill
+        const createdSales = [];
+        for (const item of data.items) {
+          const sale = await prisma.sale.create({
+            data: {
+              userId: userId,
+              billNumber: billNumber,
+              billTitle: data.billTitle || "Untitled Bill",
+              itemName: item.itemName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalAmount: item.quantity * item.unitPrice,
+              paymentMethod: data.paymentMethod || "cash",
+              billImageBase64: data.billImageBase64 || "",
+              billImageName: data.billImageName || "",
+              syncStatus: "synced"
+            }
+          });
+          createdSales.push(sale);
+        }
+        return createdSales;
+      }
+      
+      // Handle single sale item (legacy format)
       const created = await prisma.sale.create({
         data: {
           userId: userId,
           billNumber: data.billNumber || "",
           billTitle: data.billTitle || "Untitled Bill",
-          itemName: data.itemName,
-          quantity: data.quantity,
-          unitPrice: data.unitPrice,
-          totalAmount: data.totalAmount,
+          itemName: data.itemName!,
+          quantity: data.quantity!,
+          unitPrice: data.unitPrice!,
+          totalAmount: data.totalAmount || (data.quantity! * data.unitPrice!),
           paymentMethod: data.paymentMethod || "cash",
           billImageBase64: data.billImageBase64 || "",
           billImageName: data.billImageName || "",
@@ -430,8 +466,8 @@ async function processSyncSale(operation: SyncOperation, userId: string) {
           unitPrice: data.unitPrice,
           totalAmount: data.totalAmount,
           paymentMethod: data.paymentMethod,
-          billImageBase64: data.billImageBase64,
-          billImageName: data.billImageName,
+          billImageBase64: data.billImageBase64 || undefined,
+          billImageName: data.billImageName || undefined,
           syncStatus: "synced"
         }
       });

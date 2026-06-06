@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { syncManager } from '@/lib/sync/sync-manager';
-import { offlineSalesService } from '@/lib/offline-sales-service';
+import { useSync } from '@/components/sync-provider';
+import { getPendingSales } from '@/lib/offline-sales';
 
 interface SyncStatusData {
   isOnline: boolean;
@@ -19,6 +19,8 @@ interface OfflineSyncStatusProps {
 }
 
 export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSyncStatusProps) {
+  const { queueStatus, isOnline, isSyncing, forceSyncAll } = useSync();
+  
   const [status, setStatus] = useState<SyncStatusData>({
     isOnline: typeof window !== 'undefined' ? navigator.onLine : false,
     isSyncing: false,
@@ -32,50 +34,44 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
     // Only run in browser
     if (typeof window === 'undefined') return;
     
-    // Subscribe to sync status changes
-    const unsubscribe = syncManager.addListener((newStatus) => {
-      setStatus(prev => ({
-        ...prev,
-        ...newStatus
-      }));
-    });
-
-    // Update pending count
-    const updatePendingCount = async () => {
-      const syncStatus = await offlineSalesService.getSyncStatus();
-      setStatus(prev => ({
-        ...prev,
-        pendingCount: syncStatus.pendingCount
-      }));
+    // Update status from sync provider
+    const updateStatus = async () => {
+      const pendingSales = await getPendingSales();
+      setStatus({
+        isOnline,
+        isSyncing,
+        pendingCount: queueStatus.pendingOperations || pendingSales.length,
+        lastSyncTime: queueStatus.lastSyncTime?.toISOString() || null,
+        totalSynced: 0 // This could be tracked if needed
+      });
     };
 
-    updatePendingCount();
+    updateStatus();
 
     // Update pending count every 10 seconds
-    const interval = setInterval(updatePendingCount, 10000);
+    const interval = setInterval(updateStatus, 10000);
 
     return () => {
-      unsubscribe();
       clearInterval(interval);
     };
-  }, []);
+  }, [isOnline, isSyncing, queueStatus]);
 
   const handleForceSyncClick = async () => {
-    if (status.isSyncing || !status.isOnline) return;
+    if (isSyncing || !isOnline) return;
     
     try {
-      await syncManager.forceSyncAll();
+      await forceSyncAll();
     } catch (error) {
       console.error('Manual sync failed:', error);
     }
   };
 
   const getStatusIcon = () => {
-    if (status.isSyncing) {
+    if (isSyncing) {
       return <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />;
     }
     
-    if (!status.isOnline) {
+    if (!isOnline) {
       return <WifiOff className="w-4 h-4 text-red-500" />;
     }
     
@@ -87,11 +83,11 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
   };
 
   const getStatusText = () => {
-    if (status.isSyncing) {
+    if (isSyncing) {
       return "Syncing...";
     }
     
-    if (!status.isOnline) {
+    if (!isOnline) {
       return "Offline";
     }
     
@@ -103,8 +99,8 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
   };
 
   const getStatusColor = () => {
-    if (status.isSyncing) return "text-blue-600";
-    if (!status.isOnline) return "text-red-600";
+    if (isSyncing) return "text-blue-600";
+    if (!isOnline) return "text-red-600";
     if (status.pendingCount > 0) return "text-amber-600";
     return "text-green-600";
   };
@@ -130,10 +126,10 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
         <span className={`text-xs font-medium ${getStatusColor()}`}>
           {getStatusText()}
         </span>
-        {status.isOnline && status.pendingCount > 0 && (
+        {isOnline && status.pendingCount > 0 && (
           <button
             onClick={handleForceSyncClick}
-            disabled={status.isSyncing}
+            disabled={isSyncing}
             className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50 ml-1"
             title="Force sync now"
           >
@@ -157,22 +153,22 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
               {getStatusText()}
             </div>
             <div className="text-xs text-gray-500">
-              {status.isOnline ? 'Online' : 'Offline Mode'}
+              {isOnline ? 'Online' : 'Offline Mode'}
             </div>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          {status.isOnline && status.pendingCount > 0 && (
+          {isOnline && status.pendingCount > 0 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleForceSyncClick();
               }}
-              disabled={status.isSyncing}
+              disabled={isSyncing}
               className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 disabled:opacity-50"
             >
-              {status.isSyncing ? 'Syncing...' : 'Sync Now'}
+              {isSyncing ? 'Syncing...' : 'Sync Now'}
             </button>
           )}
           
@@ -188,8 +184,8 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-500">Network Status:</span>
-                <span className={status.isOnline ? 'text-green-600' : 'text-red-600'}>
-                  {status.isOnline ? 'Connected' : 'Disconnected'}
+                <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
+                  {isOnline ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
               
@@ -225,7 +221,7 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
                     {status.pendingCount} sale{status.pendingCount !== 1 ? 's' : ''} pending sync
                   </div>
                   <div className="text-amber-600 mt-1">
-                    {status.isOnline 
+                    {isOnline 
                       ? 'Sales will sync automatically or click "Sync Now"'
                       : 'Sales will sync when you come back online'
                     }
@@ -235,7 +231,7 @@ export function OfflineSyncStatus({ compact = false, className = "" }: OfflineSy
             </div>
           )}
 
-          {!status.isOnline && (
+          {!isOnline && (
             <div className="bg-blue-50 border border-blue-200 rounded p-2">
               <div className="flex items-start gap-2">
                 <WifiOff className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />

@@ -18,7 +18,8 @@ import {
   Eye,
   CheckCircle,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -89,6 +90,7 @@ export default function UserPanelPage() {
   const [stockItems, setStockItems] = useState<StockItem[]>([emptyStockItem()]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [importingPreviousReturns, setImportingPreviousReturns] = useState(false);
 
   // Calculate total bottles for an item
   const calculateTotalBottles = (item: StockItem): number => {
@@ -277,6 +279,96 @@ export default function UserPanelPage() {
     }
   };
 
+  const handleImportPreviousDayReturns = async () => {
+    if (!user?.id) {
+      setMessage({ type: "error", text: "User not found. Please refresh the page." });
+      return;
+    }
+
+    const currentDate = new Date(selectedDate);
+    const previousDate = new Date(currentDate);
+    previousDate.setDate(currentDate.getDate() - 1);
+    const previousDateStr = toDateStr(previousDate);
+
+    setImportingPreviousReturns(true);
+    setMessage(null);
+
+    try {
+      // Fetch previous day's van loads
+      const res = await fetch(`/api/admin/van-loads?userId=${user.id}&date=${previousDateStr}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch previous day's stock");
+      }
+
+      const previousLoads: VanLoad[] = await res.json();
+      
+      if (previousLoads.length === 0) {
+        setMessage({ 
+          type: "error", 
+          text: `No stock assignments found for ${previousDateStr}` 
+        });
+        return;
+      }
+
+      // Fetch previous day's sales
+      const salesRes = await fetch(`/api/sales?userId=${user.id}&date=${previousDateStr}`);
+      const previousSales: Sale[] = salesRes.ok ? await salesRes.json() : [];
+
+      // Calculate returns for each item
+      const returnsMap = new Map<string, number>();
+      
+      previousLoads.forEach(load => {
+        if (!returnsMap.has(load.itemName)) {
+          returnsMap.set(load.itemName, 0);
+        }
+        returnsMap.set(load.itemName, returnsMap.get(load.itemName)! + load.loaded + load.returned);
+      });
+
+      previousSales.forEach(sale => {
+        const current = returnsMap.get(sale.itemName) || 0;
+        returnsMap.set(sale.itemName, current - sale.quantity);
+      });
+
+      // Convert returns to stock items
+      const importedItems: StockItem[] = [];
+      returnsMap.forEach((totalBottles, itemName) => {
+        if (totalBottles > 0) {
+          const itemConfig = getItemByName(itemName);
+          const bottlesPerCase = itemConfig?.caseInfo.bottlesPerCase || 1;
+          const { cases, bottles } = convertBottlesToCases(totalBottles, bottlesPerCase);
+          
+          importedItems.push({
+            itemName,
+            cases,
+            bottles,
+            totalBottles
+          });
+        }
+      });
+
+      if (importedItems.length === 0) {
+        setMessage({ 
+          type: "error", 
+          text: `No items to import from ${previousDateStr} (all items were sold or returned)` 
+        });
+        return;
+      }
+
+      setStockItems(importedItems);
+      setMessage({ 
+        type: "success", 
+        text: `Imported ${importedItems.length} item${importedItems.length > 1 ? 's' : ''} from ${previousDateStr}` 
+      });
+    } catch (error) {
+      setMessage({ 
+        type: "error", 
+        text: error instanceof Error ? error.message : "Failed to import previous day's returns" 
+      });
+    } finally {
+      setImportingPreviousReturns(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -293,7 +385,11 @@ export default function UserPanelPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="text-xl md:text-2xl font-bold leading-tight break-words">
-              {loadingUser ? <Skeleton className="h-7 w-44" /> : `${user?.username}'s Panel`}
+              {loadingUser ? (
+                <Skeleton className="h-7 w-44" />
+              ) : (
+                `${user?.username || username}'s Panel`
+              )}
             </h1>
             <p className="text-sm text-gray-600 mt-1">Manage stock and track sales</p>
           </div>
@@ -356,12 +452,23 @@ export default function UserPanelPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <h3 className="font-semibold">Stock Items</h3>
-                <Button onClick={addStockItem} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={handleImportPreviousDayReturns} 
+                    size="sm"
+                    variant="outline"
+                    disabled={importingPreviousReturns || !user?.id}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {importingPreviousReturns ? "Importing..." : "Import Previous Day Returns"}
+                  </Button>
+                  <Button onClick={addStockItem} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
               </div>
 
               {stockItems.map((item, index) => {

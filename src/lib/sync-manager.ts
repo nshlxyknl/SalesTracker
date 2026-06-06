@@ -219,7 +219,11 @@ export class SyncManager implements ISyncManager {
     const startTime = Date.now();
     
     try {
-      console.log(`[SyncManager] Processing ${operation.type} operation for ${operation.endpoint}`);
+      console.log(`[SyncManager] Processing ${operation.type} operation for ${operation.endpoint}`, {
+        operationId: operation.id,
+        retryCount: operation.retryCount,
+        data: operation.data
+      });
 
       // Check if operation should be delayed (for retry backoff)
       if (operation.timestamp > Date.now()) {
@@ -234,12 +238,18 @@ export class SyncManager implements ISyncManager {
       }
 
       const response = await this.executeHttpRequest(operation);
+      console.log(`[SyncManager] Got response for operation ${operation.id}`, {
+        status: response.status,
+        ok: response.ok
+      });
       
       if (response.ok) {
         const responseData = await response.json();
+        console.log(`[SyncManager] Response data for operation ${operation.id}:`, responseData);
         
         // Check if the sync operation itself succeeded
         if (responseData.success === false) {
+          console.error(`[SyncManager] Sync operation ${operation.id} failed:`, responseData.error);
           return {
             operationId: operation.id,
             success: false,
@@ -273,6 +283,7 @@ export class SyncManager implements ISyncManager {
         // Update local data with server response if needed
         await this.updateLocalDataAfterSync(operation, responseData.data || responseData);
 
+        console.log(`[SyncManager] Operation ${operation.id} completed successfully`);
         return {
           operationId: operation.id,
           success: true,

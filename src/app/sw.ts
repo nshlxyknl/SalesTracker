@@ -16,16 +16,9 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: defaultCache,
-  fallbacks: {
-    entries: [
-      {
-        url: "/~offline",
-        matcher({ request }) {
-          return request.destination === "document";
-        },
-      },
-    ],
-  },
+  // Don't fallback to offline page - let the app handle offline state
+  // The app is fully functional offline with cached resources
+  fallbacks: undefined,
 });
 
 serwist.addEventListeners();
