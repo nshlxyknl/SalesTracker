@@ -21,44 +21,88 @@ const serwist = new Serwist({
   fallbacks: undefined,
 });
 
-// Add custom fetch event handler to ensure offline navigation works properly
+// Handle navigation requests specifically for PWA offline support
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const url = new URL(request.url);
 
-  // For navigation requests (page loads), try cache first, then network
-  // This ensures the app works offline without showing error pages
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      (async () => {
-        try {
-          // Try to get from cache first
-          const cachedResponse = await caches.match(request);
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          
-          // If not in cache, try network
-          return await fetch(request);
-        } catch (error) {
-          // If offline and no cache, try to return the index page
-          const indexCache = await caches.match('/');
-          if (indexCache) {
-            return indexCache;
-          }
-          
-          // Last resort: return a basic offline response
-          return new Response('Offline - Please check your connection', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({
-              'Content-Type': 'text/plain',
-            }),
-          });
-        }
-      })()
-    );
+  // Skip non-navigation requests - let Serwist handle them
+  if (request.mode !== 'navigate') {
     return;
   }
+
+  // Skip API calls and special routes
+  if (url.pathname.startsWith('/api/') || 
+      url.pathname.startsWith('/_next/') ||
+      url.pathname.startsWith('/serwist/')) {
+    return;
+  }
+
+  // For navigation requests, implement Cache-First strategy
+  event.respondWith(
+    (async () => {
+      try {
+        // First, try to get from cache
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+          console.log('[SW] Serving from cache:', url.pathname);
+          return cachedResponse;
+        }
+
+        // If not in cache and online, try network
+        if (navigator.onLine) {
+          console.log('[SW] Fetching from network:', url.pathname);
+          const networkResponse = await fetch(request);
+          
+          // Cache the response for future offline use
+          if (networkResponse.ok) {
+            const cache = await caches.open('navigation-cache');
+            cache.put(request, networkResponse.clone());
+          }
+          
+          return networkResponse;
+        }
+
+        // If offline and not in cache, try to serve the index page
+        // The React app will handle client-side routing
+        console.log('[SW] Offline - serving index page for:', url.pathname);
+        const indexResponse = await caches.match('/');
+        if (indexResponse) {
+          return indexResponse;
+        }
+
+        // Last resort: return minimal offline page
+        return new Response(
+          '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline</title></head><body><script>window.location.href="/";</script></body></html>',
+          {
+            status: 200,
+            headers: new Headers({
+              'Content-Type': 'text/html',
+            }),
+          }
+        );
+      } catch (error) {
+        console.error('[SW] Fetch error:', error);
+        
+        // On any error, try to serve index page
+        const indexResponse = await caches.match('/');
+        if (indexResponse) {
+          return indexResponse;
+        }
+
+        // Absolute last resort
+        return new Response(
+          '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline</title></head><body><script>window.location.href="/";</script></body></html>',
+          {
+            status: 200,
+            headers: new Headers({
+              'Content-Type': 'text/html',
+            }),
+          }
+        );
+      }
+    })()
+  );
 });
 
 serwist.addEventListeners();

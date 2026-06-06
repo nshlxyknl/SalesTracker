@@ -222,23 +222,36 @@ export class SyncManager {
 
       console.log(`Syncing ${unsyncedSales.length} pending sales...`);
 
+      // Group sales by billNumber to sync entire bills together
+      const billGroups = new Map<string, OfflineSale[]>();
+      for (const sale of unsyncedSales) {
+        const billNumber = sale.billNumber;
+        if (!billGroups.has(billNumber)) {
+          billGroups.set(billNumber, []);
+        }
+        billGroups.get(billNumber)!.push(sale);
+      }
+
       // Get auth headers
       const authHeaders = await persistentAuth.getAuthHeader();
       
-      for (const sale of unsyncedSales) {
+      // Sync each bill (all items together)
+      for (const [billNumber, billSales] of billGroups.entries()) {
         try {
-          await this.syncSingleSale(sale, authHeaders);
-          result.synced++;
+          await this.syncBillSales(billSales, authHeaders);
+          result.synced += billSales.length;
         } catch (error) {
-          result.failed++;
-          result.errors.push(`Sale ${sale.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          result.failed += billSales.length;
+          result.errors.push(`Bill ${billNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           
-          // Increment sync attempts
-          await OfflineStore.incrementSyncAttempts(sale.id);
-          
-          // If too many attempts, stop trying this sale for a while
-          if (sale.syncAttempts >= 5) {
-            console.warn(`Sale ${sale.id} failed 5 sync attempts, skipping for now`);
+          // Increment sync attempts for all items in this bill
+          for (const sale of billSales) {
+            await OfflineStore.incrementSyncAttempts(sale.id);
+            
+            // If too many attempts, stop trying this bill for a while
+            if (sale.syncAttempts >= 5) {
+              console.warn(`Bill ${billNumber} failed 5 sync attempts, skipping for now`);
+            }
           }
         }
       }
@@ -258,40 +271,37 @@ export class SyncManager {
   }
 
   /**
-   * Sync a single sale to the server
+   * Sync all items from a single bill to the server
    */
-  private async syncSingleSale(sale: OfflineSale, authHeaders: Record<string, string>): Promise<void> {
-    // Prepare the sale data - send as items array since sale might be part of a multi-item bill
-    const saleData = {
-      billTitle: sale.billTitle,
-      billNumber: sale.billNumber,
-      items: [{
-        itemName: sale.itemName,
-        quantity: sale.quantity,
-        unitPrice: sale.unitPrice
-      }],
-      paymentMethod: sale.paymentMethod,
-      billImageBase64: sale.billImageBase64,
-      billImageName: sale.billImageName || `${sale.billNumber}.jpg`,
-      createdAt: sale.createdAt // Preserve original creation time
-    };
+  private async syncBillSales(billSales: OfflineSale[], authHeaders: Record<string, string>): Promise<void> {
+    if (billSales.length === 0) return;
+
+    // Use the first sale for bill-level data (all items share same bill info)
+    const firstSale = billSales[0];
+    
+    // Prepare all items for this bill
+    const items = billSales.map(sale => ({
+      itemName: sale.itemName,
+      quantity: sale.quantity,
+      unitPrice: sale.unitPrice
+    }));
 
     // Use FormData to match the expected format of /api/sales
     const formData = new FormData();
-    formData.append('billTitle', saleData.billTitle);
-    formData.append('items', JSON.stringify(saleData.items));
-    formData.append('paymentMethod', saleData.paymentMethod);
+    formData.append('billTitle', firstSale.billTitle);
+    formData.append('items', JSON.stringify(items));
+    formData.append('paymentMethod', firstSale.paymentMethod);
     
-    if (saleData.billImageBase64) {
+    if (firstSale.billImageBase64) {
       // Convert base64 back to blob for upload
-      const byteString = atob(saleData.billImageBase64.split(',')[1] || saleData.billImageBase64);
+      const byteString = atob(firstSale.billImageBase64.split(',')[1] || firstSale.billImageBase64);
       const ab = new ArrayBuffer(byteString.length);
       const ia = new Uint8Array(ab);
       for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
       }
       const blob = new Blob([ab], { type: 'image/jpeg' });
-      formData.append('billImage', blob, saleData.billImageName);
+      formData.append('billImage', blob, firstSale.billImageName || `${firstSale.billNumber}.jpg`);
     }
 
     const response = await fetch('/api/sales', {
@@ -311,12 +321,18 @@ export class SyncManager {
 
     const serverResponse = await response.json();
     
-    // Mark as synced in local database
-    const serverId = Array.isArray(serverResponse) ? serverResponse[0]?.id : (serverResponse.id || serverResponse.saleId);
-    await OfflineStore.markSaleAsSynced(sale.id, serverId);
-    
-    console.log(`Sale ${sale.id} synced successfully to server ID: ${serverId}`);
+    // Mark all items in this bill as synced
+    // Server returns array of created sales (one per item)
+    if (Array.isArray(serverResponse)) {
+      for (let i = 0; i < billSales.length && i < serverResponse.length; i++) {
+        const localSale = billSales[i];
+        const serverSale = serverResponse[i];
+        await OfflineStore.markSaleAsSynced(localSale.id, serverSale.id);
+        console.log(`Sale ${localSale.id} (${localSale.itemName}) synced to server ID: ${serverSale.id}`);
+      }
+    }
   }
+
 
   /**
    * Force sync all pending items immediately
