@@ -30,8 +30,6 @@ const PUBLIC_ROUTES = [
   '/api/auth/signout',
   '/manifest.json',
   '/serwist',
-  '/~offline',
-  '/offline.html',
   '/_next',
   '/icons',
   '/favicon.ico',
