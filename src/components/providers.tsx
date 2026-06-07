@@ -9,7 +9,7 @@ import queryClient from "@/lib/query-client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SerwistProvider swUrl="/sw.js">
+    <SerwistProvider swUrl="/serwist/sw.js">
       <QueryClientProvider client={queryClient}>
         <OfflineAuthProvider>
           <SyncProvider>

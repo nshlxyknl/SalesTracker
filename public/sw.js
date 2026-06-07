@@ -31,8 +31,7 @@ const STATIC_ASSETS = [
 // Critical resources that should be cached with high priority
 const CRITICAL_RESOURCES = [
   '/api/auth/me',
-  '/api/items',
-  '/offline.html'
+  '/api/items'
 ];
 
 // Cache configuration for different resource types
@@ -199,43 +198,31 @@ async function handlePageRequest(request) {
   try {
     return await networkFirstStrategy(request, DYNAMIC_CACHE_NAME);
   } catch (error) {
-    console.error('[SW] Page request failed:', error);
+    console.log('[SW] Network failed, serving from cache:', request.url);
     
     // Try to return cached page
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
+      console.log('[SW] Serving cached version');
       return cachedResponse;
     }
     
-    // Return offline page
-    const offlineResponse = await caches.match('/');
-    if (offlineResponse) {
-      return offlineResponse;
+    // Try to serve the dashboard (main page)
+    const dashboardResponse = await caches.match('/dashboard');
+    if (dashboardResponse) {
+      console.log('[SW] Serving dashboard as fallback');
+      return dashboardResponse;
     }
     
-    // Fallback offline response
-    return new Response(
-      `<!DOCTYPE html>
-      <html>
-        <head>
-          <title>Sales Tracker - Offline</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { font-family: system-ui, sans-serif; text-align: center; padding: 2rem; }
-            .offline { color: #666; }
-          </style>
-        </head>
-        <body>
-          <h1>Sales Tracker</h1>
-          <p class="offline">You are currently offline. Please check your internet connection.</p>
-          <button onclick="window.location.reload()">Try Again</button>
-        </body>
-      </html>`,
-      {
-        status: 200,
-        headers: { 'Content-Type': 'text/html' }
-      }
-    );
+    // Last resort: serve index page
+    const indexResponse = await caches.match('/');
+    if (indexResponse) {
+      console.log('[SW] Serving index page');
+      return indexResponse;
+    }
+    
+    // Absolute fallback - redirect to dashboard
+    return Response.redirect('/dashboard', 302);
   }
 }
 
