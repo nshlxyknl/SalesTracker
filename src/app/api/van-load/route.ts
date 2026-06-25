@@ -60,26 +60,141 @@ export const POST = withAdmin(async (request: NextRequest, user) => {
     }
 
     const loadDate = new Date(date);
+    const dateStr = loadDate.toISOString().split('T')[0];
+    
+    // Get previous day's closing stock (loaded - returned - sold)
+    const previousDay = new Date(loadDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const prevDateStr = previousDay.toISOString().split('T')[0];
+    
+    // Get previous day's van loads
+    const prevVanLoads = await prisma.vanLoad.findMany({
+      where: {
+        userId,
+        date: {
+          gte: new Date(prevDateStr + 'T00:00:00.000Z'),
+          lt: new Date(prevDateStr + 'T23:59:59.999Z')
+        }
+      }
+    });
+    
+    // Get previous day's sales
+    const prevSales = await prisma.sale.findMany({
+      where: {
+        userId,
+        createdAt: {
+          gte: new Date(prevDateStr + 'T00:00:00.000Z'),
+          lt: new Date(prevDateStr + 'T23:59:59.999Z')
+        }
+      }
+    });
+    
+    // Calculate previous day's closing stock by item
+    const prevClosingStock = new Map<string, number>();
+    
+    prevVanLoads.forEach(load => {
+      const current = prevClosingStock.get(load.itemName) || 0;
+      prevClosingStock.set(load.itemName, current + load.loaded - load.returned);
+    });
+    
+    prevSales.forEach(sale => {
+      const current = prevClosingStock.get(sale.itemName) || 0;
+      prevClosingStock.set(sale.itemName, current - sale.quantity);
+    });
 
-    // Instead of deleting existing loads, we'll add new ones
-    // This allows multiple assignments per day to accumulate
+    // Check if stock was already assigned for this date
+    const existingLoads = await prisma.vanLoad.findMany({
+      where: {
+        userId,
+        date: {
+          gte: new Date(dateStr + 'T00:00:00.000Z'),
+          lt: new Date(dateStr + 'T23:59:59.999Z')
+        }
+      }
+    });
+    
+    if (existingLoads.length > 0) {
+      // If stock already exists for today, this is an ADDITIONAL assignment (not opening stock)
+      // Just add the new items
+      const created = [];
+      for (const item of items) {
+        const load = await prisma.vanLoad.create({
+          data: {
+            userId,
+            date: loadDate,
+            itemName: item.itemName,
+            loaded: item.loaded,
+            returned: item.returned,
+            casePrice: item.casePrice ?? 0,
+            schemeBottles: item.schemeBottles ?? 0,
+          },
+        });
+        created.push(load);
+      }
+      
+      return Response.json({ 
+        created,
+        note: "Additional stock added to existing assignment"
+      }, { status: 201 });
+    }
+    
+    // First assignment of the day - include previous day's closing stock
     const created = [];
-    for (const item of items) {
+    const itemsWithCarryForward = new Map<string, {
+      loaded: number;
+      returned: number;
+      casePrice: number;
+      schemeBottles: number;
+    }>();
+    
+    // Add new assignments to map
+    items.forEach(item => {
+      itemsWithCarryForward.set(item.itemName, {
+        loaded: item.loaded,
+        returned: item.returned,
+        casePrice: item.casePrice ?? 0,
+        schemeBottles: item.schemeBottles ?? 0
+      });
+    });
+    
+    // Add previous day's closing stock as opening stock for items not in new assignment
+    prevClosingStock.forEach((closing, itemName) => {
+      if (closing > 0 && !itemsWithCarryForward.has(itemName)) {
+        // Item had stock yesterday but not assigned today - carry it forward
+        itemsWithCarryForward.set(itemName, {
+          loaded: closing,
+          returned: 0,
+          casePrice: 0,
+          schemeBottles: 0
+        });
+      } else if (closing > 0 && itemsWithCarryForward.has(itemName)) {
+        // Item has both previous stock AND new assignment - add them together
+        const existing = itemsWithCarryForward.get(itemName)!;
+        existing.loaded += closing;
+      }
+    });
+    
+    // Create van load records with cumulative stock
+    for (const [itemName, data] of itemsWithCarryForward.entries()) {
       const load = await prisma.vanLoad.create({
         data: {
           userId,
           date: loadDate,
-          itemName: item.itemName,
-          loaded: item.loaded,
-          returned: item.returned,
-          casePrice: item.casePrice ?? 0,
-          schemeBottles: item.schemeBottles ?? 0,
+          itemName,
+          loaded: data.loaded,
+          returned: data.returned,
+          casePrice: data.casePrice,
+          schemeBottles: data.schemeBottles,
         },
       });
       created.push(load);
     }
 
-    return Response.json(created, { status: 201 });
+    return Response.json({ 
+      created,
+      carriedForward: Array.from(prevClosingStock.entries()).map(([itemName, qty]) => ({ itemName, quantity: qty })),
+      note: "Previous day's closing stock automatically carried forward"
+    }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/van-load] Error:", err);
     console.error("Error stack:", err instanceof Error ? err.stack : "No stack trace");
